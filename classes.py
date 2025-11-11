@@ -7,5 +7,6 @@ class User :
 
     def is_admin(self):
         return self.membership == "Admin"
-    
+    def is_student(self):
+        return self.membership == "student"
         pass
