@@ -1,6 +1,8 @@
-import sqlite3 as sql
-con=sql.connect("Database.db")
-cursor=con.cursor()
+import sqlite3 
 
-con.commit()
-con.close()
+con_user = sqlite3.connect('User.dp')
+# Creat  users table
+info = con_user.cursor()
+info.execute("CREATE TABLE users(user INTEGAR,name TEXT,emal TEXT,membership TEXT)")
+con_user.commit
+con_user.close()
