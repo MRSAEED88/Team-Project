@@ -1,8 +1,6 @@
 import sqlite3 
 
-
-
-
+# creat a file 
 con_user = sqlite3.connect('User.db')
 # Create users table
 info = con_user.cursor()
