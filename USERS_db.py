@@ -1,13 +1,28 @@
 import sqlite3 
+import random
 
 # creat a file 
 con_user = sqlite3.connect('User.db')
 # Create users table
 info = con_user.cursor()
-info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER PRIMARY KEY,name TEXT,email TEXT ,membership TEXT)")
+info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER PRIMARY KEY,name TEXT,email TEXT,passWord TEXT,membership TEXT)")
+info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER PRIMARY KEY,name TEXT,email TEXT,program TEXT,level INTEGER)")
+
+
+
+
+
+# data = info.execute("SELECT * FROM users")
+# data = data.fetchall()
+# for row in data:
+#     print(row)
+
+
+
 
 con_user.commit()
 con_user.close()
+
 
 
 class add_db:
@@ -16,12 +31,12 @@ class add_db:
         self.info= self.con.cursor()
         self.userinfo= userinfo
     def insertData(self):
-        self.info.execute("INSERT INTO users Values(?,?,?,?)", self.userinfo)
+        self.info.execute(f"INSERT INTO users Values {self.userinfo}")
         self.con.commit()
         self.con.close()
         return None
     
-import random
+
 
 class add_student:
     def __init__(self):
@@ -38,9 +53,14 @@ class add_student:
             program = random.choice(programs)
             level = random.randint(1,4)
             ID = random.randint(2400000, 2499999)
-            passw =random.ramdint(1234567,2345678) 
-
+            passw =random.randint(1234567,2345678)
+            
             email = (f"{name.lower()}{i} @kau.edu.stu.com")
-            student = student(ID, name, email, program, level)
-            self.User.append(student)
+            user=add_db((ID,name,email,passw,"student")) 
+            user.insertData()
+
+            # student = student(ID, name, email, program, level)
+            # self.User.append(student)
         pass
+# s= add_student()
+# s.createstudent()
