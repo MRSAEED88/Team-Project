@@ -19,4 +19,32 @@ class User :
         return self.membership == "student"
         pass
 
+#-----------------------------------------------------------------------------------------------------------------
+
+class Student:
+    def __init__(self, student_id, name, email, program, level):
+        self.student_id = student_id
+        self.name = name
+        self.email = email
+        self.program = program
+        self.level = level
+        self.transcript = []    #the cources student have finshed
+
+    def validate_student(self):
+        if not self.student_id or not self.name or not self.email:          # checking the inputs ID,NAME,EMAIL
+            return False, "All fields are required."
+        if self.program not in ["Computer", "Comm", "Power", "Biomedical"]: #Checking the program of student is from this choices
+            return False, "Invalid program name."
+        if self.level <= 0:
+            return False, "Level must be greater than zero."  
+        return True, "Student data is valid."
+    
+     # show academic history
+    def view_transcript(self):
+        if not self.transcript:                       #if the list of transcript is empty will print (no courses completed yet)
+            print("no courses completed yet.")
+        else:
+            print(f"Transcript for {self.name}:")
+            for record in self.transcript:
+                print(f"- {record['course_code']}: {record['grade']}")
 
