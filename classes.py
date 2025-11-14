@@ -1,15 +1,16 @@
 import users_db
 
-testcase_admin = users_db.add_db((1234,"Admin","admin@kau.edu.sa","12345678","Admin"))
-testcase_admin.insertData()
+# testcase_admin = users_db.add_users((1234,"Admin","admin@kau.edu.sa","12345678","Admin"))
+# testcase_admin.insertData()
 class User :
     def __init__(self,user_id,name,email,membership):
         self.user_id = user_id
         self.name = name
         self.email = email
+        self.password = password
         self.membership = membership
     def store_data(self):
-        user_info=users_db.add_db((self.user_id,self.name,self.email,self.membership))
+        user_info=users_db.add_users((self.user_id,self.name,self.email, self.password,self.membership))
         user_info.insertData()
 
 
@@ -21,26 +22,17 @@ class User :
 
 #-----------------------------------------------------------------------------------------------------------------
 
-class Student:
-    def __init__(self, student_id, name, email, program, level):
-        self.student_id = student_id
-        self.name = name
-        self.email = email
+class Student(User):
+    def __init__(self, user_id, name, email, program, level):
+        super().__init__(user_id,name,email,"student")
         self.program = program
         self.level = level
-        self.transcript = []    #the cources student have finshed
-        #class Student(User):
-        # def __init__(self, user_id, name, email, program, level):
-           # super().__init__(user_id, name, email, "student")
-           #self.program = program
-           #self.level = level
-           #self.transcript = []
+        self.transcript = []
 #______________________________________________________________________________________________________________________________________
     # Connect with data base:
     def connect_db(self):
-        super().__init__(user_id, name, email, "student")
         student_info = student_db.add_student(self.program,self.level,self.transcript)
-        student_info.insertdata
+        student_info.insertdata()
 
     def validate_student(self):
         if not self.student_id or not self.name or not self.email:          # checking the inputs ID,NAME,EMAIL
