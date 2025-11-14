@@ -35,6 +35,12 @@ class Student:
            #self.program = program
            #self.level = level
            #self.transcript = []
+#______________________________________________________________________________________________________________________________________
+    # Connect with data base:
+    def connect_db(self):
+        super().__init__(user_id, name, email, "student")
+        student_info = student_db.add_student(self.program,self.level,self.transcript)
+        student_info.insertdata
 
     def validate_student(self):
         if not self.student_id or not self.name or not self.email:          # checking the inputs ID,NAME,EMAIL
