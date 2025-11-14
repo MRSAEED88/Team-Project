@@ -54,3 +54,4 @@ class Student:
             for record in self.transcript:
                 print(f"- {record['course_code']}: {record['grade']}")
 
+# When we have finished Courses Class ,we will add 3 methods more wich are (Add,remove,show) courses
