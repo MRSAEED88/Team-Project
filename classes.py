@@ -30,10 +30,10 @@ class Student(User):
         self.transcript = []
 #______________________________________________________________________________________________________________________________________
     # Connect with data base:
-    def connect_db(self):
-        student_info = student_db.add_student(self.program,self.level,self.transcript)
-        student_info.insertdata()
-
+     def store_data(self):
+        student_info=users_db.add_students((self.user_id,self.name,self.email, self.password,self.membership,self.program,self.level,self.transcript))
+        student_info.insertData()
+#_______________________________________________________________________________________________________________________________________
     def validate_student(self):
         if not self.student_id or not self.name or not self.email:          # checking the inputs ID,NAME,EMAIL
             return False, "All fields are required."
