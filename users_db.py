@@ -6,6 +6,7 @@ con_user = sqlite3.connect('User.db')
 # Create users table
 info = con_user.cursor()
 info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER PRIMARY KEY,name TEXT,email TEXT,passWord TEXT,membership TEXT)")
+# Creat student table
 info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER PRIMARY KEY,name TEXT,email TEXT,program TEXT,level INTEGER)")
 
 
