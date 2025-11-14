@@ -3,12 +3,15 @@ import random
 
 # creat a file 
 con_user = sqlite3.connect('User.db')
-# Create users table
-info = con_user.cursor()
-info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER PRIMARY KEY,name TEXT,email TEXT,passWord TEXT,membership TEXT)")
-# Creat student table
-info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER PRIMARY KEY,name TEXT,email TEXT,program TEXT,level INTEGER)")
 
+ # CREAT TABLE FOR USERS
+info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER PRIMARY KEY,name TEXT," 
+"email TEXT,passWord TEXT,membership TEXT)")  
+
+#creat student table
+info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER PRIMARY KEY,name TEXT," 
+"email TEXT,program TEXT,level INTEGER,hours_completed INTEGER," 
+"hours_remaining INTEGER")
 
 
 
@@ -25,8 +28,41 @@ con_user.commit()
 con_user.close()
 
 
+class user_db:
+    def __init__(self,userinfo, con='User.db'):
+        self.con= sqlite3.connect(con)
+        self.info= self.con.cursor()
+        self.userinfo= userinfo
+    def insertData(self):
+        self.info.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", self.userinfo)
+        self.con.commit()
+        self.con.close()
+        return None
 
-class add_db:
+
+
+
+
+
+
+class student_db:
+    def __init__(self, ID, name, email, program, level, hours_completed, hours_remaining):
+        self.ID = ID
+        self.name = name
+        self.email = email
+        self.program = program
+        self.level = level
+        self.hours_completed = hours_completed
+        self.hours_remaining = hours_remaining
+    def insertData(self):
+        self.info.execute("INSERT INTO students VALUES (?, ?, ?, ?, ?,?,?)", self.userinfo)
+        self.con.commit()
+        self.con.close()
+        return None
+
+
+
+class add_users:
     def __init__(self,userinfo, con='User.db'):
         self.con= sqlite3.connect(con)
         self.info= self.con.cursor()
