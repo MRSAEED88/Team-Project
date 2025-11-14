@@ -3,7 +3,7 @@ import random
 
 # creat a file 
 con_user = sqlite3.connect('User.db')
-
+info = con_user.cursor()
  # CREAT TABLE FOR USERS
 info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER PRIMARY KEY,name TEXT," 
 "email TEXT,passWord TEXT,membership TEXT)")  
@@ -37,7 +37,7 @@ class user_db:
         self.info.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", self.userinfo)
         self.con.commit()
         self.con.close()
-        return None
+        return None 
 
 
 
@@ -46,19 +46,15 @@ class user_db:
 
 
 class student_db:
-    def __init__(self, ID, name, email, program, level, hours_completed, hours_remaining):
-        self.ID = ID
-        self.name = name
-        self.email = email
-        self.program = program
-        self.level = level
-        self.hours_completed = hours_completed
-        self.hours_remaining = hours_remaining
+    def __init__(self, ID, name, email, program, level, hours_completed, hours_remaining, con='User.db'):
+        self.con = sqlite3.connect(con)
+        self.info = self.con.cursor()
+        self.userinfo = (ID, name, email, program, level, hours_completed, hours_remaining)
+
     def insertData(self):
-        self.info.execute("INSERT INTO students VALUES (?, ?, ?, ?, ?,?,?)", self.userinfo)
+        self.info.execute("INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?)", self.userinfo)
         self.con.commit()
         self.con.close()
-        return None
 
 
 
@@ -67,11 +63,11 @@ class add_users:
         self.con= sqlite3.connect(con)
         self.info= self.con.cursor()
         self.userinfo= userinfo
-    def insertData(self):
-        self.info.execute(f"INSERT INTO users Values {self.userinfo}")
-        self.con.commit()
-        self.con.close()
-        return None
+  def insertData(self):
+    self.info.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", self.userinfo)
+    self.con.commit()
+    self.con.close()
+
     
 
 
@@ -92,12 +88,12 @@ class add_student:
             ID = random.randint(2400000, 2499999)
             passw =random.randint(1234567,2345678)
             
-            email = (f"{name.lower()}{i} @kau.edu.stu.com")
-            user=add_db((ID,name,email,passw,"student")) 
+            email = (f"{name.lower()}{i}@kau.edu.stu.com")
+            user=add_users((ID,name,email,passw,"student")) 
             user.insertData()
 
-            # student = student(ID, name, email, program, level)
-            # self.User.append(student)
+            student = student(ID, name, email, program, level)
+            self.User.append(student)
         pass
-# s= add_student()
-# s.createstudent()
+s= add_student()
+s.createstudent()
