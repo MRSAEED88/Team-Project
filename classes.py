@@ -29,6 +29,12 @@ class Student:
         self.program = program
         self.level = level
         self.transcript = []    #the cources student have finshed
+        #class Student(User):
+        # def __init__(self, user_id, name, email, program, level):
+           # super().__init__(user_id, name, email, "student")
+           #self.program = program
+           #self.level = level
+           #self.transcript = []
 
     def validate_student(self):
         if not self.student_id or not self.name or not self.email:          # checking the inputs ID,NAME,EMAIL
