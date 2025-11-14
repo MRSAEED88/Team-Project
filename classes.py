@@ -3,7 +3,7 @@ import users_db
 # testcase_admin = users_db.add_users((1234,"Admin","admin@kau.edu.sa","12345678","Admin"))
 # testcase_admin.insertData()
 class User :
-    def __init__(self,user_id,name,email,membership):
+    def __init__(self,user_id,name,email,password,membership):
         self.user_id = user_id
         self.name = name
         self.email = email
@@ -23,15 +23,17 @@ class User :
 #-----------------------------------------------------------------------------------------------------------------
 
 class Student(User):
-    def __init__(self, user_id, name, email, program, level):
-        super().__init__(user_id,name,email,"student")
+    def __init__(self, user_id, name, email, program, level, password,):
+        super().__init__(user_id, name, email, password, membership="student")
+
         self.program = program
         self.level = level
         self.transcript = []
 #______________________________________________________________________________________________________________________________________
     # Connect with data base:
-     def store_data(self):
-        student_info=users_db.add_students((self.user_id,self.name,self.email, self.password,self.membership,self.program,self.level,self.transcript))
+    def store_data(self):
+        student_info = users_db.student_db(self.user_id, self.name, self.email,
+                                             self.program, self.level, 0, 0)
         student_info.insertData()
 #_______________________________________________________________________________________________________________________________________
     def validate_student(self):
