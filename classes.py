@@ -3,7 +3,7 @@ import users_db
 # testcase_admin = users_db.add_users((1234,"Admin","admin@kau.edu.sa","12345678","Admin"))
 # testcase_admin.insertData()
 class User :
-    def __init__(self,user_id,name,email,password,membership):
+    def __init__(self,user_id : int,name : str,email : str,password : str ,membership : str ):
         self.user_id = user_id
         self.name = name
         self.email = email
@@ -23,7 +23,7 @@ class User :
 #-----------------------------------------------------------------------------------------------------------------
 
 class Student(User):
-    def __init__(self, user_id, name, email, program, level, password,):
+    def __init__(self, user_id :int , name : str, email :str , program : str, level : int, password :str,):
         super().__init__(user_id, name, email, password, membership="student")
 
         self.program = program
