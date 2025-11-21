@@ -92,7 +92,37 @@ class serach:
 
         return user_data
 
-    
+  # As you can see here we made a class for creat a courses:
+
+class CourseFactory:
+    @staticmethod # => Does not Depend on main clss it is onle order function into the class:
+    def create_and_save_courses(): # We sved as a list
+        courses = [
+            Course(1, "EE250", "Fundamental of Electrical Circuits", 4, 40, "REQ"), #REQ = I dont know about its req yet.
+            Course(2, "EE201", "Python", 3, 40,"REQ"),
+            Course(3, "EE311", "Electronics", 4, 35,"REQ"),
+            Course(4, "EE300", "Complex", 3, 40,"REQ"),
+            Course(5, "EE301", "Circuit I", 3, 40, "EE2250"),
+            Course(6, "EE341", "Machines", 3, 35,"EE2250"),
+        ]
+
+        # Connect to DB
+        con = sqlite3.connect("User.db")
+        cur = con.cursor()
+
+        # Insert each course
+        for c in courses:
+            cur.execute("""
+                INSERT OR IGNORE INTO courses(ID, course_code, course_name, credits, capacity, prereq)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, c.get_tuple())
+         # c.get_tuple() = (c.course_id, c.course_code, c.course_name, c.credits, c.capacity, c.prereq)
+
+        con.commit()
+        con.close()
+
+        # print("6 Courses added successfully!")
+
 
 
 
