@@ -113,7 +113,7 @@ class CourseFactory:
         # Insert each course
         for c in courses:
             cur.execute("""
-                INSERT OR IGNORE INTO courses(ID, course_code, course_name, credits, capacity, prereq)
+                INSERT OR REPLACE INTO courses(ID, course_code, course_name, credits, capacity, prereq)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, c.get_tuple())
          # c.get_tuple() = (c.course_id, c.course_code, c.course_name, c.credits, c.capacity, c.prereq)
