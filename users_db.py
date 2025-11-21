@@ -1,19 +1,22 @@
 import sqlite3 
  
 
-# creat a file 
+# CREAT A FILE
 con_user = sqlite3.connect('User.db')
 info = con_user.cursor()
  # CREAT TABLE FOR USERS
 info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER UNIQUE,name TEXT," 
 "email TEXT,passWord TEXT,membership TEXT)")  
-
+#__________________________________________________________________________________
 # CREAT TABLE FOR STUDENTS
 info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER UNIQUE,name TEXT," 
 "email TEXT,program TEXT,level INTEGER,hours_completed INTEGER," 
 "hours_remaining INTEGER)")
-
-
+#__________________________________________________________________________________
+# CREATE TABLE FOR COURSES
+info.execute("CREATE TABLE IF NOT EXISTS courses(ID INTEGER UNIQUE, course_code TEXT,"
+"course_name TEXT, credits INTEGER, capacity INTEGER, prereq TEXT)")
+#__________________________________________________________________________________
 
 # Here we would like to tcheck from student's table
 # data = info.execute("SELECT * FROM students")
