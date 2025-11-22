@@ -11,15 +11,11 @@ info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER UNIQUE,name TEXT,"
 #__________________________________________________________________________________
 # CREAT TABLE FOR STUDENTS
 info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER UNIQUE,name TEXT," 
-"email TEXT,program TEXT,level INTEGER,hours_completed INTEGER," 
-"hours_remaining INTEGER)")
+"email TEXT,program TEXT,level INTEGER,transcript TEXT)")
 
-#TODO: we should change the table structure to store transcript instead of hours completed and remaining 
+#TODO: we should change the table structure to store transcript instead of hours completed and remaining => (DONE!!)
 # but we have to adjust the code accordingly
 
-#this is how the new table should look like:
-# info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER UNIQUE,name TEXT," 
-# "email TEXT,program TEXT,level INTEGER,transcript TEXT)")  # Changed hours_completed and hours_remaining to transcript
 # #Transcript will be stored as a string so when we retrieve it we can convert it back to a list(we should also convert it to string when storing)
 
 #__________________________________________________________________________________
@@ -27,6 +23,16 @@ info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER UNIQUE,name TEXT,"
 info.execute("CREATE TABLE IF NOT EXISTS courses(ID INTEGER UNIQUE, course_code TEXT,"
 "course_name TEXT, credits INTEGER, capacity INTEGER, prereq TEXT)")
 #__________________________________________________________________________________
+# CREAT Registration Table
+info.execute("CREATE TABLE IF NOT EXISTS registration(student_id INTEGER,"
+"course_id INTEGER,grade TEXT, UNIQUE(student_id, course_id))")
+# UNIQUE(student_id, course_id)) => Student can not recorde the subjects more than one
+
+
+
+
+
+
 
 # Here if we like to check table we uncomment this part
 
@@ -40,10 +46,10 @@ con_user.commit()
 con_user.close()
 
 
-#TODO: We should wok on removing unnecessary classes and try to make the code more efficient
+#TODO: We should work on removing unnecessary classes and try to make the code more efficient
 # (for example merging claseses that do similar things)
 
-# i commented this part becase its duplicated in added_users class below delete if not needed
+# I commented this part becase its duplicated in added_users class below delete if not needed
 
 # class user_db:
 #     def __init__(self,userinfo):
