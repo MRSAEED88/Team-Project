@@ -4,6 +4,7 @@ import sqlite3
 # CREAT A FILE
 con_user = sqlite3.connect('User.db')
 info = con_user.cursor()
+#___________________________________________________________________________________
  # CREAT TABLE FOR USERS
 info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER UNIQUE,name TEXT," 
 "email TEXT,passWord TEXT,membership TEXT)")  
