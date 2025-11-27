@@ -9,9 +9,9 @@ class Student(User):
         self.transcript = []
 #______________________________________________________________________________________________________________________________________
     # Connect with data base:
-    def store_data(self):
+   def store_data(self):
         student_info = users_db.student_db(self.user_id, self.name, self.email,
-                                             self.program, self.level, 0, 0)
+                                             self.program, self.level, str(self.transcript))
         student_info.insertData()
 #_______________________________________________________________________________________________________________________________________
     def validate_student(self):
