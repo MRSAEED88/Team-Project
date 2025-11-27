@@ -65,15 +65,15 @@ con_user.close()
 
 
 class student_db:
-    def __init__(self, ID, name, email, program, level, hours_completed, hours_remaining):
+    def __init__(self, ID, name, email, program, level, transcript):
 
 
-        self.userinfo = (ID, name, email, program, level, hours_completed, hours_remaining)
+        self.userinfo = (ID, name, email, program, level, transcript)
 
     def insertData(self):
         con_user = sqlite3.connect('User.db')
         info = con_user.cursor()
-        info.execute("INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?)", self.userinfo)
+        info.execute("INSERT INTO students VALUES (?, ?, ?, ?, ?, ?)", self.userinfo)
         con_user.commit()
         con_user.close()
 
