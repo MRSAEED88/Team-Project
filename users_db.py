@@ -96,7 +96,7 @@ class courses_db:
     def course_insert(self,courseinfo):
         con_user = sqlite3.connect('User.db')
         info = con_user.cursor()
-        info.execute("INSERT OR REPLACE INTO courses VALUES (?, ?, ?, ?, ?, ?)", courseinfo)
+        info.execute("INSERT OR REPLACE INTO courses VALUES (?, ?, ?, ?, ?, ?)",self.courseinfo)
         con_user.commit()
         con_user.close()
 
