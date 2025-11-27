@@ -106,31 +106,85 @@ class courses_db:
     #     self.con.commit()
     #     self.con.close()
 
-class serach:
-    def __init__(self,parameter,serch_by='id'):
-        self.serch_by = serch_by
+# class search:
+#     def __init__(self, parameter, search_by='id'):
+#         self.search_by = search_by.lower()
+#         self.parameter = parameter
+
+#     def fetch_user(self):
+#         con_user = sqlite3.connect('User.db')
+#         info = con_user.cursor()
+
+#         if self.search_by == 'id':
+#             info.execute("SELECT * FROM users WHERE ID = ?", (self.parameter,))
+        
+#         elif self.search_by == 'email':
+#             info.execute("SELECT * FROM users WHERE email LIKE ?", (f"%{self.parameter}%"))   # % 
+        
+#         elif self.search_by == 'name':
+#             info.execute("SELECT * FROM users WHERE name LIKE ?", (f"%{self.parameter}%"))
+        
+#         else:
+#             con_user.close()
+#             raise ValueError("Invalid search criteria")
+
+#         user_data = info.fetchone()
+#         con_user.close()
+#         return user_data
+class search:
+    def __init__(self, parameter, table="users", search_by="id"):
+        self.table = table.lower()       # users / students / courses
+        self.search_by = search_by.lower()
         self.parameter = parameter
 
-
-    def fetch_user(self):
-#TODO: This method should be tested to ensure it works as expected
+    def fetch(self):
         con_user = sqlite3.connect('User.db')
         info = con_user.cursor()
-        if self.serch_by=='id':
-            info.execute("SELECT * FROM users WHERE id = (?)", self.parameter)
-        elif self.serch_by=='email':
-            info.execute("SELECT * FROM users WHERE email like (?)", self.parameter) 
-        elif self.serch_by=='name':
-            info.execute("SELECT * FROM users WHERE name like (?)", self.parameter)
+
+        # ---------------- USERS TABLE ----------------
+        if self.table == "users":
+            if self.search_by == "id":
+                info.execute("SELECT * FROM users WHERE ID = ?", (self.parameter,))
+            elif self.search_by == "email":
+                info.execute("SELECT * FROM users WHERE email LIKE ?", (f"%{self.parameter}%",))
+            elif self.search_by == "name":
+                info.execute("SELECT * FROM users WHERE name LIKE ?", (f"%{self.parameter}%",))
+            else:
+                raise ValueError("Invalid search criteria for users")
+
+        # ---------------- STUDENTS TABLE ----------------
+        elif self.table == "students":
+            if self.search_by == "id":
+                info.execute("SELECT * FROM students WHERE ID = ?", (self.parameter,))
+            elif self.search_by == "email":
+                info.execute("SELECT * FROM students WHERE email LIKE ?", (f"%{self.parameter}%",))
+            elif self.search_by == "name":
+                info.execute("SELECT * FROM students WHERE name LIKE ?", (f"%{self.parameter}%",))
+            elif self.search_by == "program":
+                info.execute("SELECT * FROM students WHERE program LIKE ?", (f"%{self.parameter}%",))
+            else:
+                raise ValueError("Invalid search criteria for students")
+
+        # ---------------- COURSES TABLE ----------------
+        elif self.table == "courses":
+            if self.search_by == "id":
+                info.execute("SELECT * FROM courses WHERE ID = ?", (self.parameter,))
+            elif self.search_by == "course_code":
+                info.execute("SELECT * FROM courses WHERE course_code LIKE ?", (f"%{self.parameter}%",))
+            elif self.search_by == "name":
+                info.execute("SELECT * FROM courses WHERE course_name LIKE ?", (f"%{self.parameter}%",))
+            else:
+                raise ValueError("Invalid search criteria for courses")
+ 
+     #  WE HAVE TO CORRECT
         else:
-            raise ValueError("Invalid search criteria")
-        
-        user_data = info.fetchone()
-        con_user.commit()
+            raise ValueError("Invalid table name")
+
+        result = info.fetchone()
         con_user.close()
+        return result
 
-        return user_data
-
+#TODO: This method should be tested to ensure it works as expected
   # As you can see here we made a class for creat a courses:
 
 
