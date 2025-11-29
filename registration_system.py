@@ -85,3 +85,102 @@ class RegistrationSystem:
         if student_key is None:
             student_key = getattr(student, "student_id", None)
         return self.registrations.get(student_key, [])
+
+
+
+# ---------------- This code is to test the registation system -----------------
+
+from Course import Course
+from Student import Student
+from registration_system import RegistrationSystem
+
+
+system = RegistrationSystem()
+
+EE250 = Course(
+    course_code="EE250",
+    name="Fundamentals of Electrical Circuits",
+    credits=4,            # total credits more than 11 & passed all prerequisites to get success:True
+    lecture_hours=3,
+    lab_hours=0,
+    max_capacity=40,
+    prerequisites=[]
+)
+
+EE201 = Course(
+    course_code="EE201",
+    name="Python",
+    credits=3,
+    lecture_hours=4,
+    lab_hours=0,
+    max_capacity=40,
+    prerequisites=[]
+)
+
+EE311 = Course(
+    course_code="EE311",
+    name="Electronics",
+    credits=4,
+    lecture_hours=3,
+    lab_hours=0,
+    max_capacity=35,
+    prerequisites=[]
+)
+
+EE300 = Course(
+    course_code="EE300",
+    name="Complex",
+    credits=3,
+    lecture_hours=3,
+    lab_hours=0,
+    max_capacity=40,
+    prerequisites=[]
+)
+
+EE301 = Course(
+    course_code="EE301",
+    name="Circuits",
+    credits=3,
+    lecture_hours=3,
+    lab_hours=0,
+    max_capacity=40,
+    prerequisites=["EE250"]
+)
+
+EE331 = Course(
+    course_code="EE341",
+    name="Machines",
+    credits=3,
+    lecture_hours=3,
+    lab_hours=0,
+    max_capacity=35,
+    prerequisites=["EE250"]
+)
+system.add_course(EE250)
+system.add_course(EE201)
+system.add_course(EE311)
+system.add_course(EE300)
+system.add_course(EE301)
+system.add_course(EE331)
+
+student = Student(
+    user_id=2433632,
+    name="Alaa",
+    email="alaa@stu.kau.edu.sa",
+    program="Computer",
+    level=3,
+    password="3625487"
+)
+
+student.transcript.append({"course_code": "EE250", "grade": "A"})
+
+selected = [EE250, EE201, EE311, EE300, EE301]
+
+success, messages = system.register_student(student, selected)
+
+print("Success:", success)
+print("Messages:")
+for m in messages:
+    print("-", m)
+
+print("Registered courses:", system.get_registered_courses(student))
