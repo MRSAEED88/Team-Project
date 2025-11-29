@@ -166,7 +166,7 @@ system.add_course(EE331)
 student = Student(
     user_id=2433632,
     name="Sulaiman",
-    email="alaa@stu.kau.edu.sa",
+    email="sulaiman@stu.kau.edu.sa",
     program="Computer",
     level=3,
     password="3625487"
