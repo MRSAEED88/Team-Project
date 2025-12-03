@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QMainWindow, QStackedWidget
-from gui.student_dashboard import StudentDashboard
-from gui.admin_dashboard import AdminDashboard
+from student_dashboard import StudentDashboard
+from admin_dashboard import AdminDashboard
 
 class MainWindow(QMainWindow):
     def __init__(self, user_id, user_role, user_name):
