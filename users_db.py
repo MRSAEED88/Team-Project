@@ -119,10 +119,11 @@ class add_users:
     #     self.con.close()
 
 #This class is for adding courses to the database
+
 class courses_db:
     def __init__(self,courseinfo):
         self.courseinfo= courseinfo
-    def course_insert(self,courseinfo):
+    def course_insert(self):
         con_user = sqlite3.connect('User.db')
         info = con_user.cursor()
         info.execute("INSERT OR REPLACE INTO courses VALUES (?, ?, ?, ?, ?, ?)",self.courseinfo)
