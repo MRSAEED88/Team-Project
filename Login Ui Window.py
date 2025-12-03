@@ -1,5 +1,67 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
 import resfile
+# import sqlite3
+# from PyQt5.QtWidgets import QMainWindow, QMessageBox
+
+# class LoginWindow(QMainWindow):
+#     def __init__(self):
+#         super().__init__()
+#         self.setupUi(self)
+
+#         # Connect login button to the login function
+#         self.login_btn.clicked.connect(self.login_user)
+
+#     def login_user(self):
+#         # 1) Get user input from UI fields
+#         email = self.email_input.text()
+#         password = self.password_input.text()
+
+#         # 2) Connect to the database
+#         con = sqlite3.connect("User.db")
+#         cur = con.cursor()
+
+#         # 3) Execute SELECT query to verify user
+#         cur.execute(
+#             "SELECT * FROM users WHERE email=? AND passWord=?", 
+#             (email, password)
+#         )
+#         user = cur.fetchone()
+
+#         # 4) Close the database connection
+#         con.close()
+
+#         # 5) Check if user exists
+#         if user is None:
+#             QMessageBox.warning(self, "Error", "Invalid email or password")
+#             return
+
+#         # 6) Extract user information
+#         user_id = user[0]
+#         name = user[1]
+#         membership = user[4]  # admin or student
+
+#         QMessageBox.information(self, "Welcome", f"Hello {name}")
+
+#         # 7) Redirect based on user role (membership)
+#         if membership == "student":
+#             self.open_student_dashboard(user_id)
+
+#         elif membership == "admin":
+#             self.open_admin_dashboard(user_id)
+
+#     def open_student_dashboard(self, user_id):
+#         # Import and open Student Dashboard
+#         from student_dashboard import StudentDashboard
+#         self.student = StudentDashboard(user_id)
+#         self.student.show()
+#         self.close()
+
+#     def open_admin_dashboard(self, user_id):
+#         # Import and open Admin Dashboard
+#         from Admin import AdminDashboard
+#         self.admin = AdminDashboard(user_id)
+#         self.admin.show()
+#         self.close()
 
 class LoginWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -146,3 +208,4 @@ if __name__ == "__main__":
     window.show()
 
     sys.exit(app.exec_())
+
