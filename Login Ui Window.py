@@ -1,10 +1,10 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
-import resfile
 import sqlite3
 import bcrypt
 from PyQt5.QtWidgets import QMainWindow, QMessageBox
 from gui.student_dashboard import StudentDashboard
 from gui.admin_dashboard import AdminDashboard
+
 
 class LoginWindow(QMainWindow):
     def __init__(self):
@@ -28,6 +28,31 @@ class LoginWindow(QMainWindow):
         cur.execute("SELECT id, name, email, password, membership FROM users WHERE email=?", (email,))
         user = cur.fetchone()
         con.close()
+
+        if user is None:
+            QMessageBox.warning(self, "Error", "User not found")
+            return
+
+        user_id, name, email, pw_hash, membership = user
+
+        # Convert stored hash to bytes if needed
+        if isinstance(pw_hash, str):
+            pw_hash = pw_hash.encode()
+
+        if not bcrypt.checkpw(password.encode(), pw_hash):
+            QMessageBox.warning(self, "Error", "Incorrect password")
+            return
+
+        # Redirect
+        if membership == "student":
+            self.student = StudentDashboard(user_id)
+            self.student.show()
+            self.close()
+
+        elif membership == "admin":
+            self.admin = AdminDashboard(user_id)
+            self.admin.show()
+            self.close()
 
         if user is None:
             QMessageBox.warning(self, "Error", "User not found")
@@ -199,6 +224,7 @@ if __name__ == "__main__":
     window.show()
 
     sys.exit(app.exec_())
+
 
 
 
