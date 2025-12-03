@@ -6,13 +6,22 @@ con_user = sqlite3.connect('User.db')
 info = con_user.cursor()
 #___________________________________________________________________________________
  # CREAT TABLE FOR USERS
-info.execute("CREATE TABLE IF NOT EXISTS users(ID INTEGER UNIQUE,name TEXT," 
-"email TEXT,passWord TEXT,membership TEXT)")  
+# CREAT TABLE FOR USERS
+info.execute("CREATE TABLE IF NOT EXISTS users("
+"ID INTEGER PRIMARY KEY,"
+"name TEXT,"
+"email TEXT,"
+"passWord TEXT,"
+"membership TEXT)")
 #__________________________________________________________________________________
 # CREAT TABLE FOR STUDENTS
-info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER UNIQUE,name TEXT," 
-"email TEXT,program TEXT,level INTEGER,transcript TEXT)")
-
+# CREAT TABLE FOR STUDENTS
+info.execute("CREATE TABLE IF NOT EXISTS students("
+"ID INTEGER PRIMARY KEY,"
+"name TEXT,"
+"email TEXT,"
+"program TEXT,"
+"level INTEGER)")
 
 
 #TODO: we should change the table structure to store transcript instead of hours completed and remaining => (DONE!!)
@@ -20,14 +29,41 @@ info.execute("CREATE TABLE IF NOT EXISTS students(ID INTEGER UNIQUE,name TEXT,"
 
 # #Transcript will be stored as a string so when we retrieve it we can convert it back to a list(we should also convert it to string when storing)
 
+
+# CREAT TABLE FOR TRANSCRIPTS
+info.execute("CREATE TABLE IF NOT EXISTS transcripts("
+"student_id INTEGER,"
+"course_code TEXT,"
+"grade TEXT)")
+
+
+
 #__________________________________________________________________________________
 # CREATE TABLE FOR COURSES
-info.execute("CREATE TABLE IF NOT EXISTS courses(ID INTEGER UNIQUE, course_code TEXT,"
-"course_name TEXT, credits INTEGER, capacity INTEGER, prereq TEXT)")
+# CREATE TABLE FOR COURSES
+info.execute("CREATE TABLE IF NOT EXISTS courses("
+"ID INTEGER PRIMARY KEY,"
+"course_code TEXT,"
+"course_name TEXT,"
+"credits INTEGER,"
+"lecture_hours INTEGER,"
+"lab_hours INTEGER)")
+
+
+
+
+info.execute("CREATE TABLE IF NOT EXISTS prerequisites("
+"course_code TEXT,"
+"prereq_code TEXT)")
 #__________________________________________________________________________________
 # CREAT Registration Table
-info.execute("CREATE TABLE IF NOT EXISTS registration(student_id INTEGER,"
-"course_id INTEGER,grade TEXT, UNIQUE(student_id, course_id))")
+# CREAT Registration Table
+info.execute("CREATE TABLE IF NOT EXISTS registration("
+"student_id INTEGER,"
+"course_code TEXT,"
+"grade TEXT,"
+"UNIQUE(student_id, course_code))")
+
 # UNIQUE(student_id, course_id)) => Student can not recorde the subjects more than one
 
 
