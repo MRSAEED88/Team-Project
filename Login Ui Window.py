@@ -1,43 +1,57 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
 import resfile
-# def login_user(self):
-#     import sqlite3
-#     from PyQt5.QtWidgets import QMessageBox
+import sqlite3
+import bcrypt
+from PyQt5.QtWidgets import QMainWindow, QMessageBox
+from gui.student_dashboard import StudentDashboard
+from gui.admin_dashboard import AdminDashboard
 
-#     # 1) Get input values
-#     email = self.username_input.text()
-#     password = self.password_input.text()
+class LoginWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
 
-#     # 2) Connect to SQLite database
-#     con = sqlite3.connect("User.db")
-#     cur = con.cursor()
+        # Connect login button
+        self.login_btn.clicked.connect(self.login_user)
 
-#     # 3) Execute search query for user
-#     cur.execute("SELECT * FROM users WHERE email=? AND passWord=?", (email, password)
-#     
-#     user = cur.fetchone()
+    def login_user(self):
+        email = self.email_input.text().strip()
+        password = self.password_input.text().strip()
 
-#     # 4) Close DB connection
-#     con.close()
+        if not email or not password:
+            QMessageBox.warning(self, "Error", "Please fill all fields")
+            return
 
-#     # 5) Check if user exists
-#     if user is None:
-#         QMessageBox.warning(self, "Login Failed", "Invalid Username or Password")
-#         return
+        con = sqlite3.connect("User.db")
+        cur = con.cursor()
 
-#     # 6) Extract user info (matching the users table structure)
-#     user_id = user[0]
-#     name = user[1]
-#     membership = user[4]     # "student" or "admin"
+        cur.execute("SELECT id, name, email, password, membership FROM users WHERE email=?", (email,))
+        user = cur.fetchone()
+        con.close()
 
-#     QMessageBox.information(self, "Welcome", f"Welcome {name}!")
+        if user is None:
+            QMessageBox.warning(self, "Error", "User not found")
+            return
 
-#     # 7) Redirect based on role
-#     if membership == "student":
-#         self.open_student_dashboard(user_id)
+        user_id, name, email, pw_hash, membership = user
 
-#     elif membership == "admin":
-#         self.open_admin_dashboard(user_id)
+        # Convert stored hash to bytes if needed
+        if isinstance(pw_hash, str):
+            pw_hash = pw_hash.encode()
+
+        if not bcrypt.checkpw(password.encode(), pw_hash):
+            QMessageBox.warning(self, "Error", "Incorrect password")
+            return
+
+        # Redirect
+        if membership == "student":
+            self.student = StudentDashboard(user_id)
+            self.student.show()
+            self.close()
+        elif membership == "admin":
+            self.admin = AdminDashboard(user_id)
+            self.admin.show()
+            self.close()
 
 
 class LoginWindow(QtWidgets.QWidget):
@@ -185,5 +199,6 @@ if __name__ == "__main__":
     window.show()
 
     sys.exit(app.exec_())
+
 
 
