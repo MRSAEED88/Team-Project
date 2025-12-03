@@ -8,16 +8,16 @@ info = con_user.cursor()
  # CREAT TABLE FOR USERS
 # CREAT TABLE FOR USERS
 info.execute("CREATE TABLE IF NOT EXISTS users("
-"ID INTEGER PRIMARY KEY,"
+"id INTEGER PRIMARY KEY,"
 "name TEXT,"
-"email TEXT,"
-"passWord TEXT,"
+"email TEXT UNIQUE,"
+"password TEXT,"
 "membership TEXT)")
 #__________________________________________________________________________________
 # CREAT TABLE FOR STUDENTS
 # CREAT TABLE FOR STUDENTS
 info.execute("CREATE TABLE IF NOT EXISTS students("
-"ID INTEGER PRIMARY KEY,"
+"id INTEGER PRIMARY KEY,"
 "name TEXT,"
 "email TEXT,"
 "program TEXT,"
@@ -41,17 +41,26 @@ info.execute("CREATE TABLE IF NOT EXISTS transcripts("
 #__________________________________________________________________________________
 # CREATE TABLE FOR COURSES
 # CREATE TABLE FOR COURSES
-info.execute("CREATE TABLE IF NOT EXISTS courses("
-"ID INTEGER PRIMARY KEY,"
-"course_code TEXT,"
-"course_name TEXT,"
-"credits INTEGER,"
-"lecture_hours INTEGER,"
-"lab_hours INTEGER)")
+
+#TODO check here i added max capcity column to limit number of students in a course
+info.execute("""CREATE TABLE IF NOT EXISTS courses(
+    id INTEGER PRIMARY KEY,
+    course_code TEXT UNIQUE,
+    course_name TEXT,
+    credits INTEGER,
+    lecture_hours INTEGER,
+    lab_hours INTEGER,
+    max_capacity INTEGER)""")
 
 
+# CREATE TABLE FOR PROGRAM PLANS
+info.execute("""CREATE TABLE IF NOT EXISTS program_plans(
+    program TEXT,
+    level INTEGER,
+    course_code TEXT,
+    PRIMARY KEY (program, level, course_code))""")
 
-
+# CREATE TABLE FOR PREREQUISITES
 info.execute("CREATE TABLE IF NOT EXISTS prerequisites("
 "course_code TEXT,"
 "prereq_code TEXT)")
@@ -61,27 +70,9 @@ info.execute("CREATE TABLE IF NOT EXISTS prerequisites("
 info.execute("CREATE TABLE IF NOT EXISTS registration("
 "student_id INTEGER,"
 "course_code TEXT,"
-"grade TEXT,"
 "UNIQUE(student_id, course_code))")
 
 # UNIQUE(student_id, course_id)) => Student can not recorde the subjects more than one
-
-
-
-
-
-
-
-# Here if we like to check table we uncomment this part
-
-data = info.execute("SELECT rowid,* FROM students")
-data = data.fetchall()
-for row in data:
-    print(row)
-
-
-con_user.commit()
-con_user.close()
 
 
 #TODO: We should work on removing unnecessary classes and try to make the code more efficient
@@ -89,15 +80,15 @@ con_user.close()
 
 
 class student_db:
-    def __init__(self, ID, name, email, program, level, transcript):
+    def __init__(self, ID, name, email, program, level):
 
 
-        self.userinfo = (ID, name, email, program, level, transcript)
+        self.userinfo = (ID, name, email, program, level)
 
     def insertData(self):
         con_user = sqlite3.connect('User.db')
         info = con_user.cursor()
-        info.execute("INSERT INTO students VALUES (?, ?, ?, ?, ?, ?)", self.userinfo)
+        info.execute("INSERT INTO students (id, name, email, program, level) VALUES (?, ?, ?, ?, ?)", self.userinfo)
         con_user.commit()
         con_user.close()
 
@@ -109,7 +100,7 @@ class add_users:
     def insertData(self):
         con_user = sqlite3.connect('User.db')
         info = con_user.cursor()
-        info.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", self.userinfo)
+        info.execute("INSERT INTO users (id, name, email, password, membership) VALUES (?, ?, ?, ?, ?)", self.userinfo)
         con_user.commit()
         con_user.close()
 #The comment is for future use if we decide to add student through this class
@@ -126,37 +117,9 @@ class courses_db:
     def course_insert(self):
         con_user = sqlite3.connect('User.db')
         info = con_user.cursor()
-        info.execute("INSERT OR REPLACE INTO courses VALUES (?, ?, ?, ?, ?, ?)",self.courseinfo)
+        info.execute("INSERT OR REPLACE INTO courses (id, course_code, course_name, credits, lecture_hours, lab_hours, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)",self.courseinfo)
         con_user.commit()
         con_user.close()
-
-
-
-# class search:
-#     def __init__(self, parameter, search_by='id'):
-#         self.search_by = search_by.lower()
-#         self.parameter = parameter
-
-#     def fetch_user(self):
-#         con_user = sqlite3.connect('User.db')
-#         info = con_user.cursor()
-
-#         if self.search_by == 'id':
-#             info.execute("SELECT * FROM users WHERE ID = ?", (self.parameter,))
-        
-#         elif self.search_by == 'email':
-#             info.execute("SELECT * FROM users WHERE email LIKE ?", (f"%{self.parameter}%"))   # % 
-        
-#         elif self.search_by == 'name':
-#             info.execute("SELECT * FROM users WHERE name LIKE ?", (f"%{self.parameter}%"))
-        
-#         else:
-#             con_user.close()
-#             raise ValueError("Invalid search criteria")
-
-#         user_data = info.fetchone()
-#         con_user.close()
-#         return user_data
 
 
 
@@ -182,7 +145,7 @@ class search:
         # ---------------- USERS TABLE ----------------
         if self.table == "users":
             if self.search_by == "id":
-                info.execute("SELECT * FROM users WHERE ID = ?", (self.parameter,))
+                info.execute("SELECT * FROM users WHERE id = ?", (self.parameter,))
             elif self.search_by == "email":
                 info.execute("SELECT * FROM users WHERE email LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "name":
@@ -193,7 +156,7 @@ class search:
         # ---------------- STUDENTS TABLE ----------------
         elif self.table == "students":
             if self.search_by == "id":
-                info.execute("SELECT * FROM students WHERE ID = ?", (self.parameter,))
+                info.execute("SELECT * FROM students WHERE id = ?", (self.parameter,))
             elif self.search_by == "email":
                 info.execute("SELECT * FROM students WHERE email LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "name":
@@ -206,7 +169,7 @@ class search:
         # ---------------- COURSES TABLE ----------------
         elif self.table == "courses":
             if self.search_by == "id":
-                info.execute("SELECT * FROM courses WHERE ID = ?", (self.parameter,))
+                info.execute("SELECT * FROM courses WHERE id = ?", (self.parameter,))
             elif self.search_by == "course_code":
                 info.execute("SELECT * FROM courses WHERE course_code LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "name":
@@ -222,4 +185,13 @@ class search:
         con_user.close()
         return result
 
+if __name__ == "__main__":
+    # This block is for testing the database script directly.
+    # It's better to manage connections here rather than globally.
+    db_conn = sqlite3.connect('User.db')
+    cursor = db_conn.cursor()
 
+    print("Students in the database:")
+    for row in cursor.execute("SELECT * FROM students"):
+        print(row)
+    db_conn.close()
