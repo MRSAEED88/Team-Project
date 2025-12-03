@@ -44,7 +44,13 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QListWidget, QPushButt
 #         self.student_email_label.setText(f"Email: {email}")
 #         self.student_program_label.setText(f"Program: {program}")
 #         self.student_level_label.setText(f"Level: {level}")
+ # ---- DATABASE CONNECTION ----
+        # self.load_student_info()
+        # self.load_registered_courses()
+        # self.load_available_courses()
 
+        # # Button: Register into selected course
+        # self.register_button.clicked.connect(self.register_selected_course)
 
 class StudentDashboard(QWidget):
     def __init__(self, user_id):
