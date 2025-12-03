@@ -1,6 +1,3 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QListWidget, QPushButton
-
-
 import sqlite3
 from PyQt5.QtWidgets import QMainWindow
 
@@ -10,7 +7,6 @@ class StudentDashboard(QMainWindow):
         self.setupUi(self)
 
         self.user_id = user_id
-
         self.load_student_data()
 
     def load_student_data(self):
@@ -32,6 +28,7 @@ class StudentDashboard(QMainWindow):
         self.student_email_label.setText(f"Email: {email}")
         self.student_program_label.setText(f"Program: {program}")
         self.student_level_label.setText(f"Level: {level}")
+
 
 class StudentDashboard(QWidget):
     def __init__(self, user_id):
