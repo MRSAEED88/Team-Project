@@ -35,13 +35,17 @@ def setup_database():
 
         #__________________________________________________________________________________
         # CREATE TABLE FOR COURSES
+    # Updated COURSES table suggestion
         info.execute("""CREATE TABLE IF NOT EXISTS courses(
             id INTEGER PRIMARY KEY,
             course_code TEXT UNIQUE,
             course_name TEXT,
             credits INTEGER,
-            lecture_hours INTEGER,
-            lab_hours INTEGER,
+            -- Schedule Info Needed for Conflict Checking:
+            day TEXT,          -- e.g., 'Mon', 'Tue'
+            start_time TEXT,   -- e.g., '10:00'
+            end_time TEXT,     -- e.g., '11:30'
+            room TEXT,         -- e.g., 'Room 101'
             max_capacity INTEGER)""")
 
         # CREATE TABLE FOR PROGRAM PLANS
