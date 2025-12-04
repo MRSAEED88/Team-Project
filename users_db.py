@@ -126,22 +126,16 @@ class courses_db:
 
 class search:
     def __init__(self, parameter, table="users", search_by="id"):
-        self.table = table.lower()       # users / students / courses
+        self.table = table.lower()
         self.search_by = search_by.lower()
         self.parameter = parameter
 
-    
-    #TODO: This method should be tested to ensure it works as expected
-  # As you can see here we made a class for creat a courses:
-
-
-
     def fetch(self):
-        con_user = sqlite3.connect('User.db')
-        info = con_user.cursor()
+        con = sqlite3.connect('User.db')
+        cur = con.cursor()
 
-        # ---------------- USERS TABLE ----------------
-       if self.table == "users":
+        # -------- USERS --------
+        if self.table == "users":
             if self.search_by == "id":
                 cur.execute("SELECT * FROM users WHERE id=?", (self.parameter,))
             elif self.search_by == "email":
@@ -151,8 +145,8 @@ class search:
             else:
                 raise ValueError("Invalid search criteria for users")
 
-        # ---------------- STUDENTS TABLE ----------------
-       elif self.table == "students":
+        # -------- STUDENTS --------
+        elif self.table == "students":
             if self.search_by == "id":
                 cur.execute("SELECT * FROM students WHERE id=?", (self.parameter,))
             elif self.search_by == "email":
@@ -164,8 +158,8 @@ class search:
             else:
                 raise ValueError("Invalid search criteria for students")
 
-        # ---------------- COURSES TABLE ----------------
-      elif self.table == "courses":
+        # -------- COURSES --------
+        elif self.table == "courses":
             if self.search_by == "id":
                 cur.execute("SELECT * FROM courses WHERE id=?", (self.parameter,))
             elif self.search_by == "course_code":
@@ -175,13 +169,13 @@ class search:
             else:
                 raise ValueError("Invalid search criteria for courses")
 
- 
-     #  WE HAVE TO CORRECT
-         else:
+        else:
             raise ValueError("Invalid table name")
-        result = info.fetchone()
-        con_user.close()
+
+        result = cur.fetchone()
+        con.close()
         return result
+
 
 if __name__ == "__main__":
     # This block now correctly sets up the database and then runs a test.
