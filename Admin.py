@@ -1,75 +1,281 @@
-from User import User 
+from User import User
+import users_db
 
 class Admin(User):
-    def __init__(self):
-        self.__courses = {}        # private # storage the courses here
-        self.__program_plans = {}  # private #storage plans of programs here
+    def __init__(self, user_id, name, email, password):
+        # Initialize parent User class
+        super().__init__(user_id, name, email, password, membership="Admin")
 
 
-    # Getter: allow reading courses 
-    def get_courses(self):
-        return self.__courses
+    # ============================================================
+    #                       ADD COURSE
+    # ============================================================
+    def add_course(self, code, name, credits, day, start_time, end_time, room, max_capacity, prerequisites=[]):
+        """
+        Adds a new course into the database.
+        The method validates inputs, checks duplicates, validates prerequisites,
+        then inserts the course and prerequisite records.
+        """
 
-    # Getter: allow reading program plans 
-    def get_program_plans(self):
-        return self.__program_plans
+        # ----- Input Validation -----
+        if not all([code, name, credits, day, start_time, end_time, room, max_capacity]):
+            return False, "All fields (Code, Name, Credits, Schedule, Capacity) are mandatory."
 
-    #from here the admin can be able to add new course
-    def add_course(self, code, name, credits, lec_hours, lab_hours, prerequisites, max_capacity):
-
-        #Check for missing required data
-        if not all([code, name, credits, lec_hours, lab_hours, max_capacity]) or prerequisites is None:
-            return False, "All fields are mandatory."
-
-        #here we check if the code of course is already exists before
-        if code in self.courses:
-            return False, f"Course code '{code}' already exists."
-
-        #check is the credits positve
         if credits <= 0:
             return False, "Credits must be positive."
 
-        #check that all the prerequisite courses the admin wants to set are already defined in {self.courses} 
+        # ----- Check if course exists -----
+        if self._course_exists(code):
+            return False, f"Course code '{code}' already exists."
+
+        # ----- Validate prerequisites -----
         for pre in prerequisites:
-            if pre not in self.courses: 
-                return False, f"Prerequisite '{pre}' is not a valid course."
+            if not self._course_exists(pre):
+                return False, f"Prerequisite '{pre}' does not exist."
 
-        # Now after we verified everything is ok we can now add the course as a new course
-        
-        self.courses[code] = {
-            "name": name,
-            "credits": credits,
-            "lec_hours": lec_hours,           #self.cources is a storage for all courses and the key for each course is "corse code" 
-            "lab_hours": lab_hours,           #such as (ISLS301,EE250), and its value is a second dictionary with all the course details inside(name,lec_hours.......)
-            "prerequisites": prerequisites,
-            "max_capacity": max_capacity
-        }
+        # ----- Insert Course -----
+        course_data = (None, code, name, credits, day, start_time, end_time, room, max_capacity)
 
-        return True, f"Course '{code}' added successfully."
-    
+        try:
+            # Insert course using users_db class
+            new_course = users_db.courses_db(course_data)
+            new_course.course_insert()
+
+            # Insert prerequisites
+            for pre in prerequisites:
+                users_db.execute_query(
+                    "INSERT INTO prerequisites (course_code, prereq_code) VALUES (?, ?)",
+                    (code, pre)
+                )
+
+            return True, f"Course '{code}' added successfully."
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
 
 
-    ##Enable administrators to define and manage the program plans##
+    # ============================================================
+    #                       DELETE COURSE
+    # ============================================================
+    def delete_course(self, course_code):
+        """
+        Deletes a course only if:
+        - Course exists
+        - No students are currently registered for this course
+        - Removes related prerequisites before deleting the course
+        """
 
-    #Allow the Admin to specify the Program Plan for every program such as(Computer Engineering) with detail 
-    # of the required courses per level or semester. for example (Power) - level(3) its courses will be EE491 - EE351........
-    def define_program_plan(self, program, level, course_codes):
-        if program not in ["Computer", "Comm", "Power", "Biomedical"]:
-            return False, "Invalid program."
+        # Check existence
+        if not self._course_exists(course_code):
+            return False, f"Course '{course_code}' does not exist."
 
-        #here, check is the all courses that admin want to added in the program are defined in the system before (self.courses)
-        for c in course_codes:
-            if c not in self.courses:
-                return False, f"Course '{c}' not found in system."
+        # Check if students are registered
+        reg = users_db.search(course_code, table="registrations", search_by="course_code").fetch()
+        if reg:
+            return False, "Cannot delete course. Students are currently registered."
 
-       # Add or update the plan for this program and level
-        
-        if program not in self.program_plans: # Check if the program was defined before in the system (self.program_plans)
-            self.program_plans[program] = {}         # if one of the four programs was not defined before, it will be defined here.
-        self.program_plans[program][level] = course_codes  #Here, the program is actually saved in the system by its name and level
-        #                              ##the course_codes refers to the list of courses belonging to that program##
-        # now the admin can make updates in the plans of program
-        #                      for example: self.program_plans["Computer"]["Level 3 - Semester 1"] = ["MATH241", "EE203", "EE300"]
+        try:
+            # Delete prerequisites associated with the course
+            users_db.execute_query(
+                "DELETE FROM prerequisites WHERE course_code = ? OR prereq_code = ?",
+                (course_code, course_code)
+            )
 
-        # Finally, adding the program
-        return True, f"Program plan for {program} - {level} added successfully."
+            # Delete course
+            users_db.execute_query(
+                "DELETE FROM courses WHERE course_code = ?",
+                (course_code,)
+            )
+
+            return True, f"Course '{course_code}' deleted successfully."
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
+
+
+    # ============================================================
+    #                       UPDATE COURSE
+    # ============================================================
+    def update_course(self, course_code, **kwargs):
+        """
+        Updates any course field:
+        - name
+        - credits
+        - day
+        - start_time
+        - end_time
+        - room
+        - max_capacity
+
+        Example:
+        update_course("EE201", name="Circuits I", credits=4, room="B-23")
+        """
+
+        if not self._course_exists(course_code):
+            return False, f"Course '{course_code}' does not exist."
+
+        try:
+            for field, value in kwargs.items():
+                query = f"UPDATE courses SET {field} = ? WHERE course_code = ?"
+                users_db.execute_query(query, (value, course_code))
+
+            return True, f"Course '{course_code}' updated successfully."
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
+
+
+    # ============================================================
+    #                     VIEW ALL COURSES
+    # ============================================================
+    def view_all_courses(self):
+        """
+        Returns all courses from the database.
+        Used by Admin Dashboard to display course list.
+        """
+        try:
+            return users_db.fetch_all("SELECT * FROM courses")
+        except Exception as e:
+            return False, f"Database Error: {e}"
+
+
+    # ============================================================
+    #                PREREQUISITE MANAGEMENT
+    # ============================================================
+    def add_prerequisite(self, course_code, prereq_code):
+        """
+        Adds a prerequisite to a course after validating both exist.
+        """
+
+        if not self._course_exists(course_code):
+            return False, f"Course '{course_code}' does not exist."
+
+        if not self._course_exists(prereq_code):
+            return False, f"Prerequisite '{prereq_code}' does not exist."
+
+        try:
+            users_db.execute_query(
+                "INSERT OR IGNORE INTO prerequisites (course_code, prereq_code) VALUES (?, ?)",
+                (course_code, prereq_code)
+            )
+            return True, f"Prerequisite '{prereq_code}' added to course '{course_code}'."
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
+
+
+    def remove_prerequisite(self, course_code, prereq_code):
+        """
+        Removes a prerequisite from a course.
+        """
+        try:
+            users_db.execute_query(
+                "DELETE FROM prerequisites WHERE course_code = ? AND prereq_code = ?",
+                (course_code, prereq_code)
+            )
+            return True, "Prerequisite removed."
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
+
+
+    # ============================================================
+    #                PROGRAM PLAN MANAGEMENT
+    # ============================================================
+    def view_program_plan(self, program, level):
+        """
+        Returns all course codes assigned to a program & level.
+        """
+
+        try:
+            return users_db.fetch_all(
+                "SELECT course_code FROM program_plans WHERE program = ? AND level = ?",
+                (program, level)
+            )
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
+
+
+    def remove_course_from_program(self, program, level, course_code):
+        """
+        Removes a course from a specific program and level.
+        """
+
+        try:
+            users_db.execute_query(
+                "DELETE FROM program_plans WHERE program = ? AND level = ? AND course_code = ?",
+                (program, level, course_code)
+            )
+            return True, "Course removed from program plan."
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
+
+
+    # ============================================================
+    #                   STUDENT ACCOUNT MANAGEMENT
+    # ============================================================
+    def create_student_account(self, name, email, password, program, level):
+        """
+        Creates a new student entry + user login entry.
+        """
+
+        try:
+            # Insert into students table
+            users_db.execute_query(
+                "INSERT INTO students (name, email, program, level) VALUES (?, ?, ?, ?)",
+                (name, email, program, level)
+            )
+
+            # Insert into users table
+            users_db.execute_query(
+                "INSERT INTO users (name, email, password, membership) VALUES (?, ?, ?, ?)",
+                (name, email, password, "Student")
+            )
+
+            return True, "Student account created successfully."
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
+
+
+    def delete_student(self, student_id):
+        """
+        Deletes student and related records (transcript, registrations).
+        """
+
+        try:
+            # Delete transcript
+            users_db.execute_query(
+                "DELETE FROM transcripts WHERE student_id = ?",
+                (student_id,)
+            )
+
+            # Delete registrations
+            users_db.execute_query(
+                "DELETE FROM registrations WHERE student_id = ?",
+                (student_id,)
+            )
+
+            # Delete student table entry
+            users_db.execute_query(
+                "DELETE FROM students WHERE id = ?",
+                (student_id,)
+            )
+
+            return True, "Student deleted successfully."
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
+
+
+    # ============================================================
+    #                INTERNAL HELPER METHOD
+    # ============================================================
+    def _course_exists(self, course_code):
+        """
+        Returns True if a course exists in the database.
+        """
+        search_engine = users_db.search(course_code, table="courses", search_by="course_code")
+        return search_engine.fetch() is not None
