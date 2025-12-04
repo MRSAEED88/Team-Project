@@ -8,8 +8,7 @@ def create_students(number=10):
     """
     names = ["Abdulilah", "Saeed", "Sulaiman", "Alaa", "Mohtadi", "Baraa",
              "Faisal", "Omar", "Khalid", "Ahmed", "Rayan", "Hassan"]
-    programs = ["Power and Machines", "Communication and Electronics", "Computer",
-                "Biomedical"] # Corrected typo "Biomedecal"
+    programs = ["Power", "Comm", "Computer", "Biomedical"] # Corrected typo "Biomedecal"
 
     created_students = []
     for i in range(number):
