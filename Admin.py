@@ -57,6 +57,12 @@ class Admin(User):
     # ============================================================
     #                       DELETE COURSE
     # ============================================================
+    # ============================================================
+    #                       DELETE COURSE
+    # ============================================================
+    # ============================================================
+    #                       DELETE COURSE
+    # ============================================================
     def delete_course(self, course_code):
         """
         Deletes a course only if:
@@ -64,24 +70,32 @@ class Admin(User):
         - No students are currently registered for this course
         - Removes related prerequisites before deleting the course
         """
-
-        # Check existence
-        if not self._course_exists(course_code):
-            return False, f"Course '{course_code}' does not exist."
-
-        # Check if students are registered
-        reg = users_db.search(course_code, table="registrations", search_by="course_code").fetch()
-        if reg:
-            return False, "Cannot delete course. Students are currently registered."
-
         try:
-            # Delete prerequisites associated with the course
+            # 1. Check existence
+            if not self._course_exists(course_code):
+                return False, f"Course '{course_code}' does not exist."
+
+            # 2. Check if students are registered
+            # FIX: We use 'get_current_enrollments' instead of 'search' to avoid the Invalid Table error
+            enrollments = users_db.get_current_enrollments()
+            
+            # If the course code is in the dictionary and count > 0, we can't delete it
+            if enrollments.get(course_code, 0) > 0:
+                return False, "Cannot delete course. Students are currently registered."
+
+            # 3. Delete prerequisites associated with the course
             users_db.execute_query(
                 "DELETE FROM prerequisites WHERE course_code = ? OR prereq_code = ?",
                 (course_code, course_code)
             )
 
-            # Delete course
+            # 4. Delete program plan entries
+            users_db.execute_query(
+                "DELETE FROM program_plans WHERE course_code = ?",
+                (course_code,)
+            )
+
+            # 5. Delete course
             users_db.execute_query(
                 "DELETE FROM courses WHERE course_code = ?",
                 (course_code,)
@@ -91,8 +105,10 @@ class Admin(User):
 
         except Exception as e:
             return False, f"Database Error: {e}"
+            return True, f"Course '{course_code}' deleted successfully."
 
-
+        except Exception as e:
+            return False, f"Database Error: {e}"
     # ============================================================
     #                       UPDATE COURSE
     # ============================================================
@@ -128,15 +144,44 @@ class Admin(User):
     # ============================================================
     #                     VIEW ALL COURSES
     # ============================================================
+    # ============================================================
+    #                     VIEW ALL COURSES
+    # ============================================================
     def view_all_courses(self):
         """
         Returns all courses from the database.
-        Used by Admin Dashboard to display course list.
+        Uses the existing users_db.get_all_courses() and formats it for the GUI.
         """
         try:
-            return users_db.fetch_all("SELECT * FROM courses")
+            # 1. Get raw data from the existing function in users_db
+            # Raw format from DB: (Code, Name, Credits, Capacity, Day, Start, End, Room)
+            raw_data = users_db.get_all_courses()
+            
+            formatted_data = []
+            for row in raw_data:
+                # 2. Re-arrange data to match what the GUI expects:
+                # GUI expects: (ID, Code, Name, Credits, Day, Start, End, Room, Capacity)
+                # Note: We add a dummy '0' at the start because the GUI skips the first item (ID).
+                
+                formatted_row = (
+                    0,          # Dummy ID (ignored by GUI)
+                    row[0],     # Code
+                    row[1],     # Name
+                    row[2],     # Credits
+                    row[4],     # Day
+                    row[5],     # Start
+                    row[6],     # End
+                    row[7],     # Room
+                    row[3]      # Capacity (Moved to the end to match GUI headers)
+                )
+                formatted_data.append(formatted_row)
+                
+            return formatted_data
+
         except Exception as e:
-            return False, f"Database Error: {e}"
+            # Return an empty list if something goes wrong, so the GUI doesn't crash
+            print(f"Error viewing courses: {e}")
+            return []
 
 
     # ============================================================
@@ -182,6 +227,35 @@ class Admin(User):
     # ============================================================
     #                PROGRAM PLAN MANAGEMENT
     # ============================================================
+
+    # ============================================================
+    #              DEFINE PROGRAM PLAN (Was Missing)
+    # ============================================================
+    def define_program_plan(self, program, level, course_codes):
+        """
+        Assigns a list of courses to a specific Program and Level.
+        called by AdminDashboard.submit_plan()
+        """
+        if not course_codes:
+            return False, "No course code provided."
+
+        try:
+            for code in course_codes:
+                # 1. Verify the course actually exists first
+                if not self._course_exists(code):
+                    return False, f"Error: Course '{code}' does not exist in the system."
+
+                # 2. Insert into the program_plans table
+                users_db.execute_query(
+                    "INSERT OR IGNORE INTO program_plans (program, level, course_code) VALUES (?, ?, ?)",
+                    (program, level, code)
+                )
+            return True, f"Successfully assigned {course_codes[0]} to {program} Level {level}."
+
+        except Exception as e:
+            return False, f"Database Error: {e}"
+        
+        
     def view_program_plan(self, program, level):
         """
         Returns all course codes assigned to a program & level.
