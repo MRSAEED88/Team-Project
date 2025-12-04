@@ -1,78 +1,67 @@
 import sqlite3 
  
 
-# CREAT A FILE
-con_user = sqlite3.connect('User.db')
-info = con_user.cursor()
-#___________________________________________________________________________________
- # CREAT TABLE FOR USERS
-# CREAT TABLE FOR USERS
-info.execute("CREATE TABLE IF NOT EXISTS users("
-"id INTEGER PRIMARY KEY,"
-"name TEXT,"
-"email TEXT UNIQUE,"
-"password TEXT,"
-"membership TEXT)")
-#__________________________________________________________________________________
-# CREAT TABLE FOR STUDENTS
-# CREAT TABLE FOR STUDENTS
-info.execute("CREATE TABLE IF NOT EXISTS students("
-"id INTEGER PRIMARY KEY,"
-"name TEXT,"
-"email TEXT,"
-"program TEXT,"
-"level INTEGER)")
+def setup_database():
+    """
+    Connects to the database and creates all necessary tables if they don't exist.
+    This function should be called once when the application starts.
+    """
+    with sqlite3.connect('User.db') as con:
+        info = con.cursor()
+        #___________________________________________________________________________________
+        # CREAT TABLE FOR USERS
+        info.execute("""CREATE TABLE IF NOT EXISTS users(
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            email TEXT UNIQUE,
+            password TEXT,
+            membership TEXT)""")
+        #__________________________________________________________________________________
+        # CREAT TABLE FOR STUDENTS
+        info.execute("""CREATE TABLE IF NOT EXISTS students(
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            email TEXT,
+            program TEXT,
+            level INTEGER)""")
 
 
-#TODO: we should change the table structure to store transcript instead of hours completed and remaining => (DONE!!)
-# but we have to adjust the code accordingly
-
-# #Transcript will be stored as a string so when we retrieve it we can convert it back to a list(we should also convert it to string when storing)
-
-
-# CREAT TABLE FOR TRANSCRIPTS
-info.execute("CREATE TABLE IF NOT EXISTS transcripts("
-"student_id INTEGER,"
-"course_code TEXT,"
-"grade TEXT)")
+        # CREAT TABLE FOR TRANSCRIPTS
+        info.execute("""CREATE TABLE IF NOT EXISTS transcripts(
+            student_id INTEGER,
+            course_code TEXT,
+            grade TEXT)""")
 
 
+        #__________________________________________________________________________________
+        # CREATE TABLE FOR COURSES
+        info.execute("""CREATE TABLE IF NOT EXISTS courses(
+            id INTEGER PRIMARY KEY,
+            course_code TEXT UNIQUE,
+            course_name TEXT,
+            credits INTEGER,
+            lecture_hours INTEGER,
+            lab_hours INTEGER,
+            max_capacity INTEGER)""")
 
-#__________________________________________________________________________________
-# CREATE TABLE FOR COURSES
-# CREATE TABLE FOR COURSES
+        # CREATE TABLE FOR PROGRAM PLANS
+        info.execute("""CREATE TABLE IF NOT EXISTS program_plans(
+            program TEXT,
+            level INTEGER,
+            course_code TEXT,
+            PRIMARY KEY (program, level, course_code))""")
 
-#TODO check here i added max capcity column to limit number of students in a course
-info.execute("""CREATE TABLE IF NOT EXISTS courses(
-    id INTEGER PRIMARY KEY,
-    course_code TEXT UNIQUE,
-    course_name TEXT,
-    credits INTEGER,
-    lecture_hours INTEGER,
-    lab_hours INTEGER,
-    max_capacity INTEGER)""")
-
-
-# CREATE TABLE FOR PROGRAM PLANS
-info.execute("""CREATE TABLE IF NOT EXISTS program_plans(
-    program TEXT,
-    level INTEGER,
-    course_code TEXT,
-    PRIMARY KEY (program, level, course_code))""")
-
-# CREATE TABLE FOR PREREQUISITES
-info.execute("CREATE TABLE IF NOT EXISTS prerequisites("
-"course_code TEXT,"
-"prereq_code TEXT)")
-#__________________________________________________________________________________
-# CREAT Registration Table
-# CREAT Registration Table
-info.execute("CREATE TABLE IF NOT EXISTS registration("
-"student_id INTEGER,"
-"course_code TEXT,"
-"UNIQUE(student_id, course_code))")
-
-# UNIQUE(student_id, course_id)) => Student can not recorde the subjects more than one
+        # CREATE TABLE FOR PREREQUISITES
+        info.execute("CREATE TABLE IF NOT EXISTS prerequisites("
+        "course_code TEXT,"
+        "prereq_code TEXT)")
+        #__________________________________________________________________________________
+        # CREAT Registration Table
+        info.execute("""CREATE TABLE IF NOT EXISTS registration(
+            student_id INTEGER,
+            course_code TEXT,
+            UNIQUE(student_id, course_code))""")
+    print("Database setup complete.")
 
 
 #TODO: We should work on removing unnecessary classes and try to make the code more efficient
@@ -186,6 +175,9 @@ class search:
         return result
 
 if __name__ == "__main__":
+    # This block now correctly sets up the database and then runs a test.
+    setup_database()
+
     # This block is for testing the database script directly.
     # It's better to manage connections here rather than globally.
     db_conn = sqlite3.connect('User.db')
