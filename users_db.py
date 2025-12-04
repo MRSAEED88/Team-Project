@@ -104,14 +104,20 @@ class add_users:
 #This class is for adding courses to the database
 
 class courses_db:
-    def __init__(self,courseinfo):
-        self.courseinfo= courseinfo
+    def __init__(self, courseinfo):
+        self.courseinfo = courseinfo
+
     def course_insert(self):
-        con_user = sqlite3.connect('User.db')
-        info = con_user.cursor()
-        info.execute("INSERT OR REPLACE INTO courses (id, course_code, course_name, credits, lecture_hours, lab_hours, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)",self.courseinfo)
-        con_user.commit()
-        con_user.close()
+        con = sqlite3.connect('User.db')
+        cur = con.cursor()
+        cur.execute("""
+            INSERT OR REPLACE INTO courses 
+            (id, course_code, course_name, credits, day, start_time, end_time, room, max_capacity)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, self.courseinfo)
+        con.commit()
+        con.close()
+
 
 
 
