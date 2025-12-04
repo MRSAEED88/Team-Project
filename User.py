@@ -1,3 +1,4 @@
+from users_db import add_users
 class User :
     def __init__(self,user_id : int,name : str,email : str,password : str ,membership : str ):
         self.user_id = user_id
@@ -6,7 +7,7 @@ class User :
         self.password = password
         self.membership = membership
     def store_data(self):
-        user_info=users_db.add_users((self.user_id,self.name,self.email, self.password,self.membership))
+        user_info=add_users((self.user_id,self.name,self.email, self.password,self.membership))
         user_info.insertData()
 
 
@@ -15,3 +16,4 @@ class User :
     def is_student(self):
         return self.membership == "student"
         pass
+
