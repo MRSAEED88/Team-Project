@@ -34,10 +34,23 @@ class RegistrationValidator:
         return True, "Credit hours OK."
 
     def check_program_plan(self, selected_courses, student_program, student_level):
-        allowed_courses = self.program_plan.get(student_program, {}).get(student_level, [])
+        """
+        Checks if the course belongs to the student's Program.
+        UPDATED: Allows courses from ANY level within that program.
+        """
+        # Get the dictionary of all levels for this specific program
+        # Structure: {1: ['EE201'], 2: ['EE250'], ...}
+        program_levels = self.program_plan.get(student_program, {})
+
+        # Flatten into a single list of all allowed courses for this Major
+        allowed_in_major = []
+        for level_courses in program_levels.values():
+            allowed_in_major.extend(level_courses)
+
         for course in selected_courses:
-            if course not in allowed_courses:
-                return False, f"{course} is not allowed in {student_program} Level {student_level}."
+            if course not in allowed_in_major:
+                return False, f"{course} is not in the {student_program} plan."
+        
         return True, "Program plan OK."
 
     def check_schedule_conflicts(self, selected_courses):
