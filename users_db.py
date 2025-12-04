@@ -141,44 +141,44 @@ class search:
         info = con_user.cursor()
 
         # ---------------- USERS TABLE ----------------
-        if self.table == "users":
+       if self.table == "users":
             if self.search_by == "id":
-                info.execute("SELECT * FROM users WHERE id = ?", (self.parameter,))
+                cur.execute("SELECT * FROM users WHERE id=?", (self.parameter,))
             elif self.search_by == "email":
-                info.execute("SELECT * FROM users WHERE email LIKE ?", (f"%{self.parameter}%",))
+                cur.execute("SELECT * FROM users WHERE email LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "name":
-                info.execute("SELECT * FROM users WHERE name LIKE ?", (f"%{self.parameter}%",))
+                cur.execute("SELECT * FROM users WHERE name LIKE ?", (f"%{self.parameter}%",))
             else:
                 raise ValueError("Invalid search criteria for users")
 
         # ---------------- STUDENTS TABLE ----------------
-        elif self.table == "students":
+       elif self.table == "students":
             if self.search_by == "id":
-                info.execute("SELECT * FROM students WHERE id = ?", (self.parameter,))
+                cur.execute("SELECT * FROM students WHERE id=?", (self.parameter,))
             elif self.search_by == "email":
-                info.execute("SELECT * FROM students WHERE email LIKE ?", (f"%{self.parameter}%",))
+                cur.execute("SELECT * FROM students WHERE email LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "name":
-                info.execute("SELECT * FROM students WHERE name LIKE ?", (f"%{self.parameter}%",))
+                cur.execute("SELECT * FROM students WHERE name LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "program":
-                info.execute("SELECT * FROM students WHERE program LIKE ?", (f"%{self.parameter}%",))
+                cur.execute("SELECT * FROM students WHERE program LIKE ?", (f"%{self.parameter}%",))
             else:
                 raise ValueError("Invalid search criteria for students")
 
         # ---------------- COURSES TABLE ----------------
-        elif self.table == "courses":
+      elif self.table == "courses":
             if self.search_by == "id":
-                info.execute("SELECT * FROM courses WHERE id = ?", (self.parameter,))
+                cur.execute("SELECT * FROM courses WHERE id=?", (self.parameter,))
             elif self.search_by == "course_code":
-                info.execute("SELECT * FROM courses WHERE course_code LIKE ?", (f"%{self.parameter}%",))
+                cur.execute("SELECT * FROM courses WHERE course_code LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "name":
-                info.execute("SELECT * FROM courses WHERE course_name LIKE ?", (f"%{self.parameter}%",))
+                cur.execute("SELECT * FROM courses WHERE course_name LIKE ?", (f"%{self.parameter}%",))
             else:
                 raise ValueError("Invalid search criteria for courses")
+
  
      #  WE HAVE TO CORRECT
-        else:
+         else:
             raise ValueError("Invalid table name")
-
         result = info.fetchone()
         con_user.close()
         return result
