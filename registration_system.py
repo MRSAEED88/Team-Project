@@ -1,5 +1,5 @@
 class RegistrationValidator:
-    def __init__(self, courses_data, program_plan, max_credits=18, min_credits=12):
+    def __init__(self, courses_data, program_plan, max_credits=18, min_credits=0):
         self.courses_data = courses_data
         self.program_plan = program_plan
         self.max_credits = max_credits
@@ -41,13 +41,39 @@ class RegistrationValidator:
         return True, "Program plan OK."
 
     def check_schedule_conflicts(self, selected_courses):
-        schedule_slots = {}
+        # Helper to convert HH:MM to minutes
+        def to_minutes(t_str):
+            h, m = map(int, t_str.split(':'))
+            return h * 60 + m
+
+        # 1. Build a list of time slots for all selected courses
+        # Structure: {'CourseCode': [('Day', StartMin, EndMin), ...]}
+        course_slots = {}
+        
         for course in selected_courses:
-            schedule = self.courses_data[course].get("schedule", [])
-            for slot in schedule:
-                if slot in schedule_slots:
-                    return False, f"Schedule conflict: {course} overlaps with {schedule_slots[slot]} at {slot}."
-                schedule_slots[slot] = course
+            schedule_list = self.courses_data[course].get("schedule", [])
+            slots = []
+            for item in schedule_list:
+                # item is (Day, StartStr, EndStr) -> e.g., ('Mon', '10:00', '11:20')
+                day, start_str, end_str = item
+                slots.append((day, to_minutes(start_str), to_minutes(end_str)))
+            course_slots[course] = slots
+
+        # 2. Compare every course against every other course
+        courses_list = list(course_slots.keys())
+        for i in range(len(courses_list)):
+            for j in range(i + 1, len(courses_list)):
+                c1 = courses_list[i]
+                c2 = courses_list[j]
+                
+                for slot1 in course_slots[c1]:
+                    for slot2 in course_slots[c2]:
+                        # Check Day Match
+                        if slot1[0] == slot2[0]:
+                            # Check Time Overlap: (StartA < EndB) and (StartB < EndA)
+                            if slot1[1] < slot2[2] and slot2[1] < slot1[2]:
+                                return False, f"Conflict: {c1} overlaps with {c2} on {slot1[0]}."
+
         return True, "No schedule conflicts."
 
     def check_capacity(self, selected_courses, current_enrollments):
