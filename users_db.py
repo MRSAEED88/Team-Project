@@ -35,7 +35,7 @@ def setup_database():
 
         #__________________________________________________________________________________
         # CREATE TABLE FOR COURSES
-       info.execute("""CREATE TABLE IF NOT EXISTS courses(
+        info.execute("""CREATE TABLE IF NOT EXISTS courses(
             id INTEGER PRIMARY KEY,
             course_code TEXT UNIQUE,
             course_name TEXT,
@@ -64,6 +64,12 @@ def setup_database():
             student_id INTEGER,
             course_code TEXT,
             UNIQUE(student_id, course_code))""")
+        info.execute("""CREATE TABLE IF NOT EXISTS waitlist(
+            student_id INTEGER,
+            course_code TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (student_id, course_code)
+        )""")
     print("Database setup complete.")
 
 
@@ -108,16 +114,11 @@ class courses_db:
         self.courseinfo = courseinfo
 
     def course_insert(self):
-        con = sqlite3.connect('User.db')
-        cur = con.cursor()
-        cur.execute("""
-            INSERT OR REPLACE INTO courses 
-            (id, course_code, course_name, credits, day, start_time, end_time, room, max_capacity)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, self.courseinfo)
-        con.commit()
-        con.close()
-
+        con_user = sqlite3.connect('User.db')
+        info = con_user.cursor()
+        info.execute("INSERT OR REPLACE INTO courses (id, course_code, course_name, credits, day, start_time, end_time, room, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",self.courseinfo)
+        con_user.commit()
+        con_user.close()
 
 
 
@@ -131,51 +132,168 @@ class search:
         self.parameter = parameter
 
     def fetch(self):
-        con = sqlite3.connect('User.db')
-        cur = con.cursor()
+        con_user = sqlite3.connect('User.db')
+        info = con_user.cursor()
 
         # -------- USERS --------
         if self.table == "users":
             if self.search_by == "id":
-                cur.execute("SELECT * FROM users WHERE id=?", (self.parameter,))
+                info.execute("SELECT * FROM users WHERE id = ?", (self.parameter,))
             elif self.search_by == "email":
-                cur.execute("SELECT * FROM users WHERE email LIKE ?", (f"%{self.parameter}%",))
+                info.execute("SELECT * FROM users WHERE email LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "name":
-                cur.execute("SELECT * FROM users WHERE name LIKE ?", (f"%{self.parameter}%",))
+                info.execute("SELECT * FROM users WHERE name LIKE ?", (f"%{self.parameter}%",))
             else:
                 raise ValueError("Invalid search criteria for users")
 
-        # -------- STUDENTS --------
+        # ---------------- STUDENTS TABLE ----------------
         elif self.table == "students":
             if self.search_by == "id":
-                cur.execute("SELECT * FROM students WHERE id=?", (self.parameter,))
+                info.execute("SELECT * FROM students WHERE id = ?", (self.parameter,))
             elif self.search_by == "email":
-                cur.execute("SELECT * FROM students WHERE email LIKE ?", (f"%{self.parameter}%",))
+                info.execute("SELECT * FROM students WHERE email LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "name":
-                cur.execute("SELECT * FROM students WHERE name LIKE ?", (f"%{self.parameter}%",))
+                info.execute("SELECT * FROM students WHERE name LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "program":
-                cur.execute("SELECT * FROM students WHERE program LIKE ?", (f"%{self.parameter}%",))
+                info.execute("SELECT * FROM students WHERE program LIKE ?", (f"%{self.parameter}%",))
             else:
                 raise ValueError("Invalid search criteria for students")
 
-        # -------- COURSES --------
+        # ---------------- COURSES TABLE ----------------
         elif self.table == "courses":
             if self.search_by == "id":
-                cur.execute("SELECT * FROM courses WHERE id=?", (self.parameter,))
+                info.execute("SELECT * FROM courses WHERE id = ?", (self.parameter,))
             elif self.search_by == "course_code":
-                cur.execute("SELECT * FROM courses WHERE course_code LIKE ?", (f"%{self.parameter}%",))
+                info.execute("SELECT * FROM courses WHERE course_code LIKE ?", (f"%{self.parameter}%",))
             elif self.search_by == "name":
-                cur.execute("SELECT * FROM courses WHERE course_name LIKE ?", (f"%{self.parameter}%",))
+                info.execute("SELECT * FROM courses WHERE course_name LIKE ?", (f"%{self.parameter}%",))
             else:
                 raise ValueError("Invalid search criteria for courses")
-
+ 
+     #  WE HAVE TO CORRECT
         else:
             raise ValueError("Invalid table name")
 
-        result = cur.fetchone()
-        con.close()
+        result = info.fetchone()
+        con_user.close()
         return result
 
+
+#---------------------------------------------New--------------------------------------------
+
+def add_to_waitlist(student_id, course_code):
+    """Adds a student to the waitlist for a specific course."""
+    with sqlite3.connect('User.db') as con:
+        # We use INSERT OR IGNORE to prevent crashing if they are already on the waitlist
+        con.execute("INSERT OR IGNORE INTO waitlist (student_id, course_code) VALUES (?, ?)", 
+                    (student_id, course_code))
+        con.commit()
+def get_all_courses_data():
+    """Fetches all course data required for the RegistrationValidator."""
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute("""
+            SELECT c.course_code, c.course_name, c.credits, c.max_capacity, 
+                   c.day, c.start_time, c.end_time, GROUP_CONCAT(p.prereq_code)
+            FROM courses c
+            LEFT JOIN prerequisites p ON c.course_code = p.course_code
+            GROUP BY c.course_code
+        """)
+        courses_data = {}
+        for row in cur.fetchall():
+            prereqs = (row[7] or "").split(',') if row[7] else []
+            courses_data[row[0]] = {
+                "name": row[1],
+                "credits": row[2],
+                "max_capacity": row[3],
+                "schedule": [(row[4], row[5], row[6])],
+                "prerequisites": prereqs
+            }
+        return courses_data
+
+def get_full_program_plan():
+    """Fetches the entire program plan for the RegistrationValidator."""
+    from collections import defaultdict
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute("SELECT program, level, course_code FROM program_plans")
+        program_plan = defaultdict(lambda: defaultdict(list))
+        for prog, lvl, code in cur.fetchall():
+            program_plan[prog][lvl].append(code)
+        return program_plan
+
+def get_current_enrollments():
+    """Fetches a dictionary of current enrollments for each course."""
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute("SELECT course_code, COUNT(student_id) FROM registration GROUP BY course_code")
+        return {row[0]: row[1] for row in cur.fetchall()}
+
+def get_registered_courses(student_id):
+    """Fetches all course codes a student is registered for."""
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute("SELECT course_code FROM registration WHERE student_id=?", (student_id,))
+        return {row[0] for row in cur.fetchall()}
+
+def get_plan_courses(program, level):
+    """Fetches all course codes for a given program and level."""
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute("SELECT course_code FROM program_plans WHERE program=? AND level=?", (program, level))
+        return {row[0] for row in cur.fetchall()}
+
+def get_completed_courses(student_id):
+    """Fetches all course codes from a student's transcript."""
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute("SELECT course_code FROM transcripts WHERE student_id=?", (student_id,))
+        return {row[0] for row in cur.fetchall()}
+
+def get_course_credits(course_code):
+    """Fetches the credits for a single course."""
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute("SELECT credits FROM courses WHERE course_code=?", (course_code,))
+        result = cur.fetchone()
+        return result[0] if result else 0
+
+def get_credits_for_courses(course_codes):
+    """Calculates the total credit hours for a given list of course codes."""
+    return sum(get_course_credits(code) for code in course_codes)
+
+def execute_query(query, params=()):
+    """A general purpose function to execute insert/update/delete queries."""
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute(query, params)
+        con.commit()
+
+def register_course_for_student(student_id, course_code):
+    """Registers a student for a specific course in the registration table."""
+    query = "INSERT INTO registration (student_id, course_code) VALUES (?, ?)"
+    execute_query(query, (student_id, course_code))
+
+def drop_course_for_student(student_id, course_code):
+    """Removes a student's course registration from the registration table."""
+    query = "DELETE FROM registration WHERE student_id=? AND course_code=?"
+    execute_query(query, (student_id, course_code))
+
+def get_all_courses():
+    """Fetches all courses from the database."""
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute("SELECT course_code, course_name, credits, max_capacity, day, start_time, end_time, room FROM courses ORDER BY course_code")
+        return cur.fetchall()
+
+def delete_course(course_code):
+    """Deletes a course from the courses table."""
+    with sqlite3.connect('User.db') as con:
+        cur = con.cursor()
+        cur.execute("DELETE FROM courses WHERE course_code=?", (course_code,))
+        cur.execute("DELETE FROM prerequisites WHERE course_code=? OR prereq_code=?", (course_code, course_code))
+        cur.execute("DELETE FROM program_plans WHERE course_code=?", (course_code,))
+        cur.execute("DELETE FROM registration WHERE course_code=?", (course_code,))
 
 if __name__ == "__main__":
     # This block now correctly sets up the database and then runs a test.
@@ -187,6 +305,6 @@ if __name__ == "__main__":
     cursor = db_conn.cursor()
 
     print("Students in the database:")
-    for row in cursor.execute("SELECT * FROM students"):
+    for row in cursor.execute("SELECT * FROM users"):
         print(row)
     db_conn.close()
