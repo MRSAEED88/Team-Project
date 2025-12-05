@@ -67,9 +67,22 @@ class RegistrationValidator:
             schedule_list = self.courses_data[course].get("schedule", [])
             slots = []
             for item in schedule_list:
-                # item is (Day, StartStr, EndStr) -> e.g., ('Mon', '10:00', '11:20')
-                day, start_str, end_str = item
-                slots.append((day, to_minutes(start_str), to_minutes(end_str)))
+                # item is (DaysString, StartStr, EndStr) -> e.g., ('Sun/Tue', '10:00', '11:20')
+                days_str, start_str, end_str = item
+                
+                # --- Modification Here ---
+                # We normalize the separator (replace / with ,) and split to handle each day individually.
+                # This ensures "Sun/Tue" creates two separate checks: one for Sun, one for Tue.
+                individual_days = days_str.replace('/', ',').split(',')
+                
+                start_min = to_minutes(start_str)
+                end_min = to_minutes(end_str)
+
+                for day in individual_days:
+                    day = day.strip() # Remove any extra whitespace
+                    if day:
+                        slots.append((day, start_min, end_min))
+            
             course_slots[course] = slots
 
         # 2. Compare every course against every other course
