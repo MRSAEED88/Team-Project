@@ -1,230 +1,126 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
+from PyQt5.QtWidgets import QMessageBox
 import sqlite3
 import bcrypt
-from PyQt5.QtWidgets import QMainWindow, QMessageBox
-from gui.student_dashboard import StudentDashboard
-from gui.admin_dashboard import AdminDashboard
+import sys
 
+# IMPORTS
+# Ensure these file names match exactly what you have in your folder
+from student_dashboard import StudentDashboard
+from admin_dashboard import AdminDashboard 
 
-class LoginWindow(QMainWindow):
+class LoginWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.setupUi(self)
+        self.setWindowTitle("KAU Login")
+        self.setFixedSize(900, 600)
+        self.setStyleSheet("background-color: #e8f0ec;")
 
-        # Connect login button
+        # Main Layout
+        main_layout = QtWidgets.QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Left Panel (Image)
+        self.left_panel = QtWidgets.QLabel()
+        self.left_panel.setMinimumWidth(450)
+        self.left_panel.setAlignment(QtCore.Qt.AlignCenter)
+        
+        # Try to load image, handle failure gracefully
+        pix = QtGui.QPixmap("KAU ENGNEERING DEP.jpg")
+        if not pix.isNull():
+            self.left_panel.setPixmap(pix.scaled(550, 600, QtCore.Qt.KeepAspectRatioByExpanding))
+        else:
+            self.left_panel.setText("KAU Image Not Found")
+            self.left_panel.setStyleSheet("background: #ccc; color: #333; font-weight: bold;")
+
+        # Right Panel (Form)
+        right_panel = QtWidgets.QFrame()
+        right_panel.setFixedWidth(450)
+        right_panel.setStyleSheet("background: white; border-top-right-radius: 40px; border-bottom-right-radius: 40px;")
+        
+        form_layout = QtWidgets.QVBoxLayout(right_panel)
+        form_layout.setContentsMargins(60, 40, 60, 40)
+        form_layout.setSpacing(20)
+
+        # Title
+        title = QtWidgets.QLabel("Log In")
+        title.setStyleSheet("font-size: 32px; font-weight: bold; color: #004E89;")
+        title.setAlignment(QtCore.Qt.AlignCenter)
+        form_layout.addWidget(title)
+
+        # Inputs
+        self.email_input = QtWidgets.QLineEdit()
+        self.email_input.setPlaceholderText("Enter Email")
+        self.email_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px;")
+        
+        self.password_input = QtWidgets.QLineEdit()
+        self.password_input.setPlaceholderText("Enter Password")
+        self.password_input.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.password_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px;")
+
+        form_layout.addWidget(QtWidgets.QLabel("Email"))
+        form_layout.addWidget(self.email_input)
+        form_layout.addWidget(QtWidgets.QLabel("Password"))
+        form_layout.addWidget(self.password_input)
+
+        # Buttons
+        self.login_btn = QtWidgets.QPushButton("Login")
+        self.login_btn.setStyleSheet("background-color: #1E5631; color: white; padding: 10px; border-radius: 5px; font-weight: bold;")
         self.login_btn.clicked.connect(self.login_user)
+        
+        form_layout.addWidget(self.login_btn)
+        form_layout.addStretch()
+        
+        main_layout.addWidget(self.left_panel)
+        main_layout.addWidget(right_panel)
 
     def login_user(self):
         email = self.email_input.text().strip()
         password = self.password_input.text().strip()
 
         if not email or not password:
-            QMessageBox.warning(self, "Error", "Please fill all fields")
+            QMessageBox.warning(self, "Error", "Fields cannot be empty.")
             return
 
-        con = sqlite3.connect("User.db")
-        cur = con.cursor()
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            # Check for user
+            cur.execute("SELECT id, name, email, password, membership FROM users WHERE email=?", (email,))
+            user = cur.fetchone()
+            con.close()
 
-        cur.execute("SELECT id, name, email, password, membership FROM users WHERE email=?", (email,))
-        user = cur.fetchone()
-        con.close()
+            if user:
+                user_id, name, db_email, pw_hash, membership = user
+                
+                # Verify password (handles bcrypt or plain text)
+                if isinstance(pw_hash, str):
+                    pw_hash = pw_hash.encode()
+                
+                try:
+                    valid = bcrypt.checkpw(password.encode(), pw_hash)
+                except ValueError:
+                    # Fallback if password in DB is not hashed (plain text)
+                    valid = (password == pw_hash.decode())
 
-        if user is None:
-            QMessageBox.warning(self, "Error", "User not found")
-            return
+                if valid:
+                    if membership == "admin":
+                        self.dashboard = AdminDashboard(user_id)
+                    else:
+                        self.dashboard = StudentDashboard(user_id)
+                    
+                    self.dashboard.show()
+                    self.close()
+                else:
+                    QMessageBox.warning(self, "Error", "Invalid Password")
+            else:
+                QMessageBox.warning(self, "Error", "User not found")
 
-        user_id, name, email, pw_hash, membership = user
-
-        # Convert stored hash to bytes if needed
-        if isinstance(pw_hash, str):
-            pw_hash = pw_hash.encode()
-
-        if not bcrypt.checkpw(password.encode(), pw_hash):
-            QMessageBox.warning(self, "Error", "Incorrect password")
-            return
-
-        # Redirect
-        if membership == "student":
-            self.student = StudentDashboard(user_id)
-            self.student.show()
-            self.close()
-
-        elif membership == "admin":
-            self.admin = AdminDashboard(user_id)
-            self.admin.show()
-            self.close()
-
-        if user is None:
-            QMessageBox.warning(self, "Error", "User not found")
-            return
-
-        user_id, name, email, pw_hash, membership = user
-
-        # Convert stored hash to bytes if needed
-        if isinstance(pw_hash, str):
-            pw_hash = pw_hash.encode()
-
-        if not bcrypt.checkpw(password.encode(), pw_hash):
-            QMessageBox.warning(self, "Error", "Incorrect password")
-            return
-
-        # Redirect
-        if membership == "student":
-            self.student = StudentDashboard(user_id)
-            self.student.show()
-            self.close()
-        elif membership == "admin":
-            self.admin = AdminDashboard(user_id)
-            self.admin.show()
-            self.close()
-
-
-class LoginWindow(QtWidgets.QWidget):
-    def __init__(self):
-        super().__init__()
-
-        self.setWindowTitle("KAU Login")
-        self.setFixedSize(900, 600)
-        self.setStyleSheet("background-color: #e8f0ec;")
-
-        
-        main_layout = QtWidgets.QHBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-
-        
-        self.left_panel = QtWidgets.QLabel()
-        self.left_panel.setMinimumWidth(450)
-        self.left_panel.setAlignment(QtCore.Qt.AlignCenter)
-
-        pix = QtGui.QPixmap("KAU ENGNEERING DEP.jpg") 
-        if not pix.isNull():
-            pix = pix.scaled(550, 595,
-                             QtCore.Qt.KeepAspectRatioByExpanding,
-                             QtCore.Qt.SmoothTransformation)
-            self.left_panel.setPixmap(pix)
-        else:
-            self.left_panel.setText("KAU Image\nNot Found")
-            self.left_panel.setStyleSheet("""
-                color: #555;
-                font-size: 18px;
-                font-weight: bold;
-            """)
-
-        
-        right_panel = QtWidgets.QFrame()
-        right_panel.setFixedWidth(450)
-        right_panel.setStyleSheet("""
-            QFrame {
-                background: white;
-                border-top-right-radius: 40px;
-                border-bottom-right-radius: 40px;
-            }
-        """)
-
-        login_layout = QtWidgets.QVBoxLayout(right_panel)
-        login_layout.setContentsMargins(60, 40, 60, 40)
-        login_layout.setSpacing(20)
-
-        #Title
-        title = QtWidgets.QLabel("Log In")
-        title.setAlignment(QtCore.Qt.AlignCenter)
-        title.setStyleSheet("""
-            font-size: 32px;
-            font-weight: bold;
-            color: #004E89;
-        """)
-        login_layout.addWidget(title)
-        login_layout.addSpacing(10)
-
-        # Username
-        username_label = QtWidgets.QLabel("Username")
-        username_label.setStyleSheet("font-size: 14px; color: #555;")
-        login_layout.addWidget(username_label)
-
-        username = QtWidgets.QLineEdit()
-        username.setPlaceholderText("Enter your Username")
-        username.setFixedHeight(40)
-        username.setStyleSheet("""
-            QLineEdit {
-                border: none;
-                border-bottom: 2px solid #1E5631;
-                font-size: 16px;
-                padding-left: 4px;
-            }
-            QLineEdit:focus {
-                border-bottom: 2px solid #004E89;
-            }
-        """)
-        login_layout.addWidget(username)
-
-        #Password
-        password_label = QtWidgets.QLabel("Password")
-        password_label.setStyleSheet("font-size: 14px; color: #555;")
-        login_layout.addWidget(password_label)
-
-        password = QtWidgets.QLineEdit()
-        password.setPlaceholderText("Enter your password")
-        password.setEchoMode(QtWidgets.QLineEdit.Password)
-        password.setFixedHeight(40)
-        password.setStyleSheet("""
-            QLineEdit {
-                border: none;
-                border-bottom: 2px solid #1E5631;
-                font-size: 16px;
-                padding-left: 4px;
-            }
-            QLineEdit:focus {
-                border-bottom: 2px solid #004E89;
-            }
-        """)
-        login_layout.addWidget(password)
-
-        login_layout.addSpacing(20)
-
-        
-        login_btn = QtWidgets.QPushButton("L o g   I n")
-        login_btn.setFixedHeight(48)
-        login_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1E5631;
-                color: white;
-                font-size: 18px;
-                font-weight: bold;
-                border-radius: 10px;
-                letter-spacing: 2px;
-            }
-            QPushButton:hover {
-                background-color: #004E89;
-            }
-            QPushButton:pressed {
-                background-color: #00335f;
-            }
-        """)
-        login_layout.addWidget(login_btn)
-
-        
-        forgot = QtWidgets.QLabel("Forgot your Username or password?")
-        forgot.setAlignment(QtCore.Qt.AlignCenter)
-        forgot.setStyleSheet("font-size: 13px; color: #004E89;")
-        login_layout.addWidget(forgot)
-
-        login_layout.addStretch()
-
-        
-        main_layout.addWidget(self.left_panel)
-        main_layout.addWidget(right_panel)
-
+        except Exception as e:
+            QMessageBox.critical(self, "Database Error", str(e))
 
 if __name__ == "__main__":
-    import sys
     app = QtWidgets.QApplication(sys.argv)
-
     window = LoginWindow()
     window.show()
-
     sys.exit(app.exec_())
-
-
-
-
