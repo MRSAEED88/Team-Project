@@ -3,7 +3,8 @@ import sqlite3
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QFrame, QStackedWidget,
-                             QLineEdit, QAbstractItemView, QMessageBox, QComboBox, QSpinBox, QFormLayout)
+                             QLineEdit, QAbstractItemView, QMessageBox, QComboBox, 
+                             QSpinBox, QFormLayout)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
@@ -238,6 +239,45 @@ class AdminDashboard(QMainWindow):
         action_layout.addWidget(self.btn_del_student)
         layout.addLayout(action_layout)
 
+        # ---------- NEW: ADD STUDENT FORM ----------
+        form_frame = QFrame()
+        form_frame.setProperty("class", "card")
+        form_layout = QFormLayout(form_frame)
+        form_layout.setLabelAlignment(Qt.AlignRight)
+
+        lbl_form = QLabel("Add New Student")
+        lbl_form.setProperty("class", "section-title")
+        form_layout.addRow(lbl_form)
+
+        self.inp_s_id = QLineEdit()
+        self.inp_s_id.setPlaceholderText("e.g. 2241234")
+
+        self.inp_s_name = QLineEdit()
+        self.inp_s_name.setPlaceholderText("Full Name")
+
+        self.inp_s_email = QLineEdit()
+        self.inp_s_email.setPlaceholderText("student@kau.edu.sa")
+
+        self.inp_s_program = QComboBox()
+        self.inp_s_program.addItems(["Computer", "Communications", "Power", "Biomedical"])
+
+        self.inp_s_level = QSpinBox()
+        self.inp_s_level.setRange(1, 10)
+
+        form_layout.addRow("Student ID:", self.inp_s_id)
+        form_layout.addRow("Name:", self.inp_s_name)
+        form_layout.addRow("Email:", self.inp_s_email)
+        form_layout.addRow("Program:", self.inp_s_program)
+        form_layout.addRow("Level:", self.inp_s_level)
+
+        self.btn_add_student = QPushButton("Add Student")
+        self.btn_add_student.setProperty("class", "success-btn")
+        self.btn_add_student.clicked.connect(self.handle_add_student)
+        form_layout.addRow(self.btn_add_student)
+
+        layout.addWidget(form_frame)
+        # ------------------------------------------
+
         self.content_area.addWidget(page)
 
     # =======================================================
@@ -340,7 +380,6 @@ class AdminDashboard(QMainWindow):
             c_count = cur.fetchone()[0]
             con.close()
             
-            # Update Card Labels (2nd item in layout is value label)
             self.card_students.layout().itemAt(1).widget().setText(str(s_count))
             self.card_courses.layout().itemAt(1).widget().setText(str(c_count))
         except Exception as e:
@@ -398,6 +437,41 @@ class AdminDashboard(QMainWindow):
                 self.load_dashboard_stats()
             else:
                 QMessageBox.warning(self, "Error", msg)
+
+    def handle_add_student(self):
+        """
+        Simple create student into `students` table.
+        """
+        student_id = self.inp_s_id.text().strip()
+        name = self.inp_s_name.text().strip()
+        email = self.inp_s_email.text().strip()
+        program = self.inp_s_program.currentText()
+        level = self.inp_s_level.value()
+
+        if not student_id or not name or not email:
+            QMessageBox.warning(self, "Error", "Please fill Student ID, Name, and Email.")
+            return
+
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute(
+                "INSERT INTO students (id, name, email, program, level) VALUES (?, ?, ?, ?, ?)",
+                (student_id, name, email, program, level)
+            )
+            con.commit()
+            con.close()
+
+            QMessageBox.information(self, "Success", "Student added successfully.")
+            self.load_students()
+            self.load_dashboard_stats()
+
+            self.inp_s_id.clear()
+            self.inp_s_name.clear()
+            self.inp_s_email.clear()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Database Error: {e}")
 
     def handle_add_course(self):
         # Gather Data
