@@ -1,219 +1,369 @@
+import sys
 import sqlite3
-from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QPushButton, QListWidget, QStackedWidget, 
-                             QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
-                             QFormLayout, QLineEdit, QMessageBox, QComboBox, QSpinBox, QCheckBox)
+from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout, 
+                             QHBoxLayout, QLabel, QPushButton, QTableWidget, 
+                             QTableWidgetItem, QHeaderView, QFrame, QStackedWidget,
+                             QLineEdit, QAbstractItemView, QMessageBox, QComboBox, QSpinBox, QFormLayout)
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
+# --- IMPORT ADMIN LOGIC ---
 from Admin import Admin
 
 class AdminDashboard(QMainWindow):
     def __init__(self, user_id=None):
         super().__init__()
-        self.setWindowTitle("KAU Admin Dashboard")
-        self.resize(1100, 700)
-        self.user_id = user_id
-
-        # Admin logic class
+        self.setWindowTitle("KAU Admin Portal | Fall 2025")
+        self.resize(1300, 800)
+        
+        # 1. Initialize Admin Logic (Mock credentials since we are already logged in)
         self.admin_logic = Admin(user_id, "Admin", "admin@kau.edu.sa", "pass")
 
-        # Layout
+        # 2. Apply Professional Styles
+        self.setup_styles()
+
+        # 3. Setup Layouts
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.main_layout = QHBoxLayout(self.central_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
+        # 4. Build UI Components
         self.setup_sidebar()
-
+        
         self.content_area = QStackedWidget()
         self.main_layout.addWidget(self.content_area)
 
-        self.setup_student_page()
-        self.setup_course_page()
+        # 5. Create Pages
+        self.create_dashboard_page()   # Index 0
+        self.create_students_page()    # Index 1
+        self.create_courses_page()     # Index 2
 
+        # 6. Initial Data Load
+        self.load_dashboard_stats()
         self.load_students()
         self.load_courses()
 
-    # ---------------- Sidebar ----------------
+        # Default Page
+        self.nav_dashboard.setChecked(True)
+        self.content_area.setCurrentIndex(0)
+
+    # =======================================================
+    # STYLE SHEET
+    # =======================================================
+    def setup_styles(self):
+        self.setStyleSheet("""
+            QMainWindow { background-color: #f4f6f9; }
+            
+            /* Sidebar */
+            QFrame#Sidebar { background-color: #2c3e50; color: white; border: none; }
+            QLabel#LogoLabel { font-size: 22px; font-weight: bold; color: #ecf0f1; padding: 20px; }
+            
+            /* Nav Buttons */
+            QPushButton[class="nav-btn"] {
+                background-color: transparent; border: none; color: #bdc3c7;
+                text-align: left; padding: 15px 25px; font-size: 14px;
+                border-left: 4px solid transparent;
+            }
+            QPushButton[class="nav-btn"]:hover { background-color: #34495e; color: white; }
+            QPushButton[class="nav-btn"]:checked { background-color: #34495e; color: white; border-left: 4px solid #3498db; }
+            
+            /* Page Titles */
+            QLabel[class="page-title"] { 
+                font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 10px; 
+            }
+            QLabel[class="section-title"] { 
+                font-size: 16px; font-weight: bold; color: #27ae60; margin-top: 10px; 
+            }
+            
+            /* Cards */
+            QFrame[class="card"] { 
+                background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; 
+            }
+            
+            /* Tables */
+            QTableWidget { background-color: white; border: 1px solid #dcdcdc; gridline-color: #ecf0f1; font-size: 13px; }
+            QHeaderView::section { background-color: #ecf0f1; padding: 8px; border: none; font-weight: bold; color: #2c3e50; }
+            
+            /* Inputs */
+            QLineEdit, QComboBox, QSpinBox {
+                padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; background: white;
+            }
+            
+            /* Action Buttons */
+            QPushButton[class="action-btn"] { background-color: #2980b9; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }
+            QPushButton[class="action-btn"]:hover { background-color: #3498db; }
+            
+            QPushButton[class="success-btn"] { background-color: #27ae60; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }
+            QPushButton[class="success-btn"]:hover { background-color: #2ecc71; }
+            
+            QPushButton[class="danger-btn"] { background-color: #c0392b; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }
+            QPushButton[class="danger-btn"]:hover { background-color: #e74c3c; }
+        """)
+
+    # =======================================================
+    # SIDEBAR
+    # =======================================================
     def setup_sidebar(self):
         self.sidebar = QFrame()
-        self.sidebar.setFixedWidth(220)
-        self.sidebar.setStyleSheet("background-color: #2c3e50; color: white;")
-        self.sidebar_layout = QVBoxLayout(self.sidebar)
+        self.sidebar.setObjectName("Sidebar")
+        self.sidebar.setFixedWidth(240)
+        
+        layout = QVBoxLayout(self.sidebar)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
 
-        self.lbl_title = QLabel("Admin Panel")
-        self.lbl_title.setStyleSheet("font-size: 20px; font-weight: bold; margin-bottom: 20px; color: #ecf0f1;")
-        self.lbl_title.setAlignment(Qt.AlignCenter)
-        self.sidebar_layout.addWidget(self.lbl_title)
+        # Logo
+        logo = QLabel("Admin Portal")
+        logo.setObjectName("LogoLabel")
+        layout.addWidget(logo)
 
-        self.btn_students = self.create_nav_button("Manage Students")
-        self.btn_courses = self.create_nav_button("Manage Courses")
+        # Nav Buttons
+        self.nav_dashboard = self.create_nav_button("Dashboard Overview")
+        self.nav_students = self.create_nav_button("Manage Students")
+        self.nav_courses = self.create_nav_button("Manage Courses")
+        
+        layout.addWidget(self.nav_dashboard)
+        layout.addWidget(self.nav_students)
+        layout.addWidget(self.nav_courses)
+        
+        layout.addStretch()
+        
+        # Logout Button
         self.btn_logout = self.create_nav_button("Log Out")
-
-        self.sidebar_layout.addStretch()
-
-        self.btn_students.clicked.connect(lambda: self.content_area.setCurrentWidget(self.page_students))
-        self.btn_courses.clicked.connect(lambda: self.content_area.setCurrentWidget(self.page_courses))
         self.btn_logout.clicked.connect(self.close)
+        layout.addWidget(self.btn_logout)
 
         self.main_layout.addWidget(self.sidebar)
 
+        # Connect Navigation
+        self.nav_dashboard.clicked.connect(lambda: self.switch_page(0, self.nav_dashboard))
+        self.nav_students.clicked.connect(lambda: self.switch_page(1, self.nav_students))
+        self.nav_courses.clicked.connect(lambda: self.switch_page(2, self.nav_courses))
+
     def create_nav_button(self, text):
         btn = QPushButton(text)
-        btn.setStyleSheet("""
-            QPushButton { 
-                text-align: left; padding: 12px; border: none; 
-                background: none; color: #bdc3c7; font-size: 15px; 
-            }
-            QPushButton:hover { background-color: #34495e; color: white; }
-        """)
-        self.sidebar_layout.addWidget(btn)
+        btn.setCheckable(True)
+        btn.setAutoExclusive(True)
+        btn.setProperty("class", "nav-btn")
         return btn
 
-    # ---------------- STUDENTS PAGE ----------------
-    def setup_student_page(self):
-        self.page_students = QWidget()
-        layout = QVBoxLayout(self.page_students)
-        layout.setContentsMargins(20, 20, 20, 20)
+    def switch_page(self, index, btn_sender):
+        self.content_area.setCurrentIndex(index)
+        btn_sender.setChecked(True)
 
-        header = QLabel("Student Management")
-        header.setStyleSheet("font-size: 24px; font-weight: bold; color: #2c3e50;")
-        layout.addWidget(header)
+    # =======================================================
+    # PAGE 1: OVERVIEW
+    # =======================================================
+    def create_dashboard_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(30, 30, 30, 30)
+        
+        title = QLabel("System Overview")
+        title.setProperty("class", "page-title")
+        layout.addWidget(title)
 
+        # Stats Cards
+        cards_layout = QHBoxLayout()
+        cards_layout.setSpacing(20)
+
+        self.card_students = self.create_info_card("Total Students", "Loading...", "#2980b9")
+        self.card_courses = self.create_info_card("Active Courses", "Loading...", "#27ae60")
+        
+        cards_layout.addWidget(self.card_students)
+        cards_layout.addWidget(self.card_courses)
+        cards_layout.addStretch()
+        
+        layout.addLayout(cards_layout)
+        layout.addStretch()
+        self.content_area.addWidget(page)
+
+    def create_info_card(self, title, value, color):
+        card = QFrame()
+        card.setProperty("class", "card")
+        card.setStyleSheet(f"border-top: 4px solid {color}; background: white; border-radius: 8px;")
+        l = QVBoxLayout(card)
+        l.setContentsMargins(20, 20, 20, 20)
+        
+        t = QLabel(title)
+        t.setStyleSheet("color: #7f8c8d; font-size: 14px; font-weight: bold;")
+        v = QLabel(value)
+        v.setStyleSheet("color: #2c3e50; font-size: 28px; font-weight: bold;")
+        
+        l.addWidget(t)
+        l.addWidget(v)
+        return card
+
+    # =======================================================
+    # PAGE 2: MANAGE STUDENTS
+    # =======================================================
+    def create_students_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(30, 30, 30, 30)
+
+        # Header
+        header = QHBoxLayout()
+        title = QLabel("Student Management")
+        title.setProperty("class", "page-title")
+        header.addWidget(title)
+        header.addStretch()
+        
+        btn_refresh = QPushButton("Refresh List")
+        btn_refresh.setProperty("class", "action-btn")
+        btn_refresh.clicked.connect(self.load_students)
+        header.addWidget(btn_refresh)
+        layout.addLayout(header)
+
+        # Table
         self.student_table = QTableWidget()
         self.student_table.setColumnCount(5)
         self.student_table.setHorizontalHeaderLabels(["ID", "Name", "Email", "Program", "Level"])
         self.student_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.student_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.student_table.setAlternatingRowColors(True)
+        self.student_table.verticalHeader().setVisible(False)
         layout.addWidget(self.student_table)
 
-        btn_layout = QHBoxLayout()
-        self.btn_refresh_students = QPushButton("Refresh List")
-        self.btn_delete_student = QPushButton("Delete Selected Student")
-        self.btn_delete_student.setStyleSheet("background-color: #c0392b; color: white; padding: 8px;")
+        # Action Bar
+        action_layout = QHBoxLayout()
+        action_layout.addStretch()
         
-        btn_layout.addWidget(self.btn_refresh_students)
-        btn_layout.addWidget(self.btn_delete_student)
-        layout.addLayout(btn_layout)
-
-        self.btn_refresh_students.clicked.connect(self.load_students)
-        self.btn_delete_student.clicked.connect(self.delete_selected_student)
+        self.btn_del_student = QPushButton("Delete Selected Student")
+        self.btn_del_student.setProperty("class", "danger-btn")
+        self.btn_del_student.clicked.connect(self.handle_delete_student)
         
-        self.content_area.addWidget(self.page_students)
+        action_layout.addWidget(self.btn_del_student)
+        layout.addLayout(action_layout)
 
-    def load_students(self):
-        try:
-            con = sqlite3.connect("User.db")
-            cur = con.cursor()
-            cur.execute("SELECT id, name, email, program, level FROM users WHERE membership='student'")
-            rows = cur.fetchall()
-            con.close()
+        self.content_area.addWidget(page)
 
-            self.student_table.setRowCount(0)
-            for row_idx, row_data in enumerate(rows):
-                self.student_table.insertRow(row_idx)
-                for col_idx, data in enumerate(row_data):
-                    self.student_table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
-        except Exception as e:
-            print(f"Error loading students: {e}")
+    # =======================================================
+    # PAGE 3: MANAGE COURSES
+    # =======================================================
+    def create_courses_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(30, 30, 30, 30)
 
-    def delete_selected_student(self):
-        row = self.student_table.currentRow()
-        if row < 0:
-            QMessageBox.warning(self, "Warning", "Select a student to delete.")
-            return
+        # Header
+        title = QLabel("Course Management")
+        title.setProperty("class", "page-title")
+        layout.addWidget(title)
 
-        student_id = self.student_table.item(row, 0).text()
-        confirm = QMessageBox.question(self, "Confirm", f"Delete student {student_id}?", QMessageBox.Yes | QMessageBox.No)
-        
-        if confirm == QMessageBox.Yes:
-            success, msg = self.admin_logic.delete_student(student_id)
-            if success:
-                QMessageBox.information(self, "Success", msg)
-                self.load_students()
-            else:
-                QMessageBox.warning(self, "Error", msg)
-
-    # ---------------- COURSES PAGE ----------------
-    def setup_course_page(self):
-        self.page_courses = QWidget()
-        layout = QVBoxLayout(self.page_courses)
-        layout.setContentsMargins(20, 20, 20, 20)
-
-        layout.addWidget(QLabel("Existing Courses", styleSheet="font-size: 18px; font-weight: bold;"))
-        
+        # --- Top: Table ---
         self.course_table = QTableWidget()
         self.course_table.setColumnCount(8)
         self.course_table.setHorizontalHeaderLabels(["Code", "Name", "Credits", "Day", "Start", "End", "Room", "Cap"])
         self.course_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.course_table.setFixedHeight(250)
+        self.course_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.course_table.setAlternatingRowColors(True)
+        self.course_table.setFixedHeight(300)
+        self.course_table.verticalHeader().setVisible(False)
         layout.addWidget(self.course_table)
 
-        # -------- FORM --------
+        # Delete Button
+        btn_del_layout = QHBoxLayout()
+        btn_del_layout.addStretch()
+        self.btn_del_course = QPushButton("Delete Selected Course")
+        self.btn_del_course.setProperty("class", "danger-btn")
+        self.btn_del_course.clicked.connect(self.handle_delete_course)
+        btn_del_layout.addWidget(self.btn_del_course)
+        layout.addLayout(btn_del_layout)
+
+        # --- Bottom: Add Course Form ---
         form_frame = QFrame()
-        form_frame.setStyleSheet("background-color: #f0f2f5; border-radius: 10px; padding: 10px;")
+        form_frame.setProperty("class", "card")
         form_layout = QVBoxLayout(form_frame)
+        
+        lbl_add = QLabel("Add New Course")
+        lbl_add.setProperty("class", "section-title")
+        form_layout.addWidget(lbl_add)
 
-        form_layout.addWidget(QLabel("Add New Course", styleSheet="font-size: 16px; font-weight: bold; color: #27ae60;"))
-
+        # Grid of Inputs
         grid = QHBoxLayout()
-
+        
+        # Col 1
+        col1 = QVBoxLayout()
         self.inp_code = QLineEdit(); self.inp_code.setPlaceholderText("Code (e.g. EE201)")
         self.inp_name = QLineEdit(); self.inp_name.setPlaceholderText("Course Name")
-        self.inp_credits = QSpinBox(); self.inp_credits.setRange(1, 6)
-
-        # Day checkboxes
-        self.day_container = QWidget()
-        self.day_layout = QHBoxLayout(self.day_container)
-        self.day_layout.setContentsMargins(0,0,0,0)
-        self.day_checkboxes = []
-        for d in ["Sun", "Mon", "Tue", "Wed", "Thu"]:
-            chk = QCheckBox(d)
-            self.day_checkboxes.append(chk)
-            self.day_layout.addWidget(chk)
-
-        self.inp_start = QSpinBox(); self.inp_start.setRange(8, 20); self.inp_start.setSuffix(":00")
-        self.inp_end = QSpinBox(); self.inp_end.setRange(9, 21); self.inp_end.setSuffix(":00")
-
-        self.inp_room = QLineEdit(); self.inp_room.setPlaceholderText("Room")
-        self.inp_cap = QSpinBox(); self.inp_cap.setRange(10, 100); self.inp_cap.setValue(30)
-
-        col1 = QVBoxLayout()
-        col1.addWidget(QLabel("Code:")); col1.addWidget(self.inp_code)
-        col1.addWidget(QLabel("Name:")); col1.addWidget(self.inp_name)
-        col1.addWidget(QLabel("Credits:")); col1.addWidget(self.inp_credits)
-
+        self.inp_credits = QSpinBox(); self.inp_credits.setRange(1, 6); self.inp_credits.setPrefix("Credits: ")
+        col1.addWidget(QLabel("Details"))
+        col1.addWidget(self.inp_code)
+        col1.addWidget(self.inp_name)
+        col1.addWidget(self.inp_credits)
+        
+        # Col 2
         col2 = QVBoxLayout()
-        col2.addWidget(QLabel("Day:")); col2.addWidget(self.day_container)
-        col2.addWidget(QLabel("Start:")); col2.addWidget(self.inp_start)
-        col2.addWidget(QLabel("End:")); col2.addWidget(self.inp_end)
+        self.inp_day = QComboBox(); self.inp_day.addItems(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"])
+        self.inp_start = QSpinBox(); self.inp_start.setRange(8, 20); self.inp_start.setSuffix(":00"); self.inp_start.setPrefix("Start: ")
+        self.inp_end = QSpinBox(); self.inp_end.setRange(9, 21); self.inp_end.setSuffix(":00"); self.inp_end.setPrefix("End: ")
+        col2.addWidget(QLabel("Schedule"))
+        col2.addWidget(self.inp_day)
+        col2.addWidget(self.inp_start)
+        col2.addWidget(self.inp_end)
 
+        # Col 3
         col3 = QVBoxLayout()
-        col3.addWidget(QLabel("Room:")); col3.addWidget(self.inp_room)
-        col3.addWidget(QLabel("Capacity:")); col3.addWidget(self.inp_cap)
+        self.inp_room = QLineEdit(); self.inp_room.setPlaceholderText("Room (e.g. 25-101)")
+        self.inp_cap = QSpinBox(); self.inp_cap.setRange(10, 100); self.inp_cap.setValue(30); self.inp_cap.setPrefix("Cap: ")
+        
+        self.btn_add_course = QPushButton("Add Course")
+        self.btn_add_course.setProperty("class", "success-btn")
+        self.btn_add_course.clicked.connect(self.handle_add_course)
+        
+        col3.addWidget(QLabel("Location"))
+        col3.addWidget(self.inp_room)
+        col3.addWidget(self.inp_cap)
+        col3.addWidget(self.btn_add_course)
 
         grid.addLayout(col1)
         grid.addLayout(col2)
         grid.addLayout(col3)
         form_layout.addLayout(grid)
 
-        self.btn_add_course = QPushButton("Add Course")
-        self.btn_add_course.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; padding: 10px;")
-        self.btn_add_course.clicked.connect(self.add_course)
-        form_layout.addWidget(self.btn_add_course)
-
-        # ========== NEW BUTTON: DELETE COURSE ==========
-        self.btn_delete_course = QPushButton("Delete Selected Course")
-        self.btn_delete_course.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold; padding: 10px;")
-        self.btn_delete_course.clicked.connect(self.delete_selected_course)
-        form_layout.addWidget(self.btn_delete_course)
-        # =================================================
-
         layout.addWidget(form_frame)
-        self.content_area.addWidget(self.page_courses)
+        self.content_area.addWidget(page)
 
-    # -------- LOAD COURSES --------
+    # =======================================================
+    # DATA LOADING & LOGIC
+    # =======================================================
+    def load_dashboard_stats(self):
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute("SELECT COUNT(*) FROM students")
+            s_count = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM courses")
+            c_count = cur.fetchone()[0]
+            con.close()
+            
+            # Update Card Labels (2nd item in layout is value label)
+            self.card_students.layout().itemAt(1).widget().setText(str(s_count))
+            self.card_courses.layout().itemAt(1).widget().setText(str(c_count))
+        except Exception as e:
+            print(f"Stats Error: {e}")
+
+    def load_students(self):
+        self.student_table.setRowCount(0)
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute("SELECT id, name, email, program, level FROM students")
+            rows = cur.fetchall()
+            con.close()
+
+            for row_idx, row_data in enumerate(rows):
+                self.student_table.insertRow(row_idx)
+                for col_idx, data in enumerate(row_data):
+                    self.student_table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
+        except Exception as e:
+            print(f"Student Load Error: {e}")
+
     def load_courses(self):
+        self.course_table.setRowCount(0)
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
@@ -221,91 +371,82 @@ class AdminDashboard(QMainWindow):
             rows = cur.fetchall()
             con.close()
 
-            self.course_table.setRowCount(0)
             for row_idx, row_data in enumerate(rows):
                 self.course_table.insertRow(row_idx)
                 for col_idx, data in enumerate(row_data):
                     self.course_table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
         except Exception as e:
-            print(f"Error loading courses: {e}")
+            print(f"Course Load Error: {e}")
 
-    # -------- ADD COURSE --------
-    def add_course(self):
-        code = self.inp_code.text()
-        name = self.inp_name.text()
-        credits = self.inp_credits.value()
-
-        selected_days = [chk.text() for chk in self.day_checkboxes if chk.isChecked()]
-        if not selected_days:
-            QMessageBox.warning(self, "Error", "Select at least one day.")
-            return
-
-        day = ",".join(selected_days)
-
-        start = str(self.inp_start.value()) + ":00"
-        end = str(self.inp_end.value()) + ":00"
-        room = self.inp_room.text()
-        cap = self.inp_cap.value()
-
-        success, msg = self.admin_logic.add_course(code, name, credits, day, start, end, room, cap, [])
-        
-        if success:
-            QMessageBox.information(self, "Success", msg)
-            self.load_courses()
-            self.inp_code.clear()
-            self.inp_name.clear()
-            for chk in self.day_checkboxes:
-                chk.setChecked(False)
-        else:
-            QMessageBox.warning(self, "Error", msg)
-
-    # -------- DELETE COURSE --------
-    def delete_selected_course(self):
-        row = self.course_table.currentRow()
+    # =======================================================
+    # HANDLERS
+    # =======================================================
+    def handle_delete_student(self):
+        row = self.student_table.currentRow()
         if row < 0:
-            QMessageBox.warning(self, "Warning", "Select a course to delete.")
+            QMessageBox.warning(self, "Warning", "Please select a student to delete.")
             return
 
-        course_code = self.course_table.item(row, 0).text()
-
-        confirm = QMessageBox.question(
-            self,
-            "Confirm Deletion",
-            f"Are you sure you want to delete course '{course_code}'?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
+        student_id = self.student_table.item(row, 0).text()
+        confirm = QMessageBox.question(self, "Confirm", f"Delete student ID {student_id}?\nThis will remove all their records.", QMessageBox.Yes | QMessageBox.No)
+        
         if confirm == QMessageBox.Yes:
-            success, msg = self.admin_logic.delete_course(course_code)
+            success, msg = self.admin_logic.delete_student(student_id)
             if success:
                 QMessageBox.information(self, "Success", msg)
-                self.load_courses()
+                self.load_students()
+                self.load_dashboard_stats()
             else:
                 QMessageBox.warning(self, "Error", msg)
 
+    def handle_add_course(self):
+        # Gather Data
+        code = self.inp_code.text()
+        name = self.inp_name.text()
+        credits = self.inp_credits.value()
+        day = self.inp_day.currentText()
+        start = self.inp_start.value()
+        end = self.inp_end.value()
+        room = self.inp_room.text()
+        cap = self.inp_cap.value()
 
-    def add_student(self):
-        student_id = self.inp_s_id.text()
-        name = self.inp_s_name.text()
-        email = self.inp_s_email.text()
-        program = self.inp_s_program.currentText()
-        level = self.inp_s_level.value()
-        password = self.inp_s_password.text()
-
-        if not (student_id and name and email and password):
-            QMessageBox.warning(self, "Error", "Please fill all fields.")
-            return
-
-        success, msg = self.admin_logic.add_student(student_id, name, email, program, level, password)
-
+        # Call Logic
+        success, msg = self.admin_logic.add_course(code, name, credits, day, start, end, room, cap, [])
+        
         if success:
-            QMessageBox.information(self, "Success", msg)
-            self.load_students()
-
-            # Clear inputs
-            self.inp_s_id.clear()
-            self.inp_s_name.clear()
-            self.inp_s_email.clear()
-            self.inp_s_password.clear()
+            QMessageBox.information(self, "Success", "Course Added Successfully")
+            self.load_courses()
+            self.load_dashboard_stats()
+            # Clear Inputs
+            self.inp_code.clear()
+            self.inp_name.clear()
+            self.inp_room.clear()
         else:
             QMessageBox.warning(self, "Error", msg)
+
+    def handle_delete_course(self):
+        row = self.course_table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Warning", "Please select a course to delete.")
+            return
+            
+        code = self.course_table.item(row, 0).text()
+        confirm = QMessageBox.question(self, "Confirm", f"Delete course {code}?", QMessageBox.Yes | QMessageBox.No)
+        
+        if confirm == QMessageBox.Yes:
+            success, msg = self.admin_logic.delete_course(code)
+            if success:
+                QMessageBox.information(self, "Success", msg)
+                self.load_courses()
+                self.load_dashboard_stats()
+            else:
+                QMessageBox.warning(self, "Error", msg)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    font = QFont("Segoe UI", 10)
+    app.setFont(font)
+
+    window = AdminDashboard()
+    window.show()
+    sys.exit(app.exec_())
