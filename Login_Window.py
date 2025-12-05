@@ -1,126 +1,245 @@
-from PyQt5 import QtWidgets, QtGui, QtCore
-from PyQt5.QtWidgets import QMessageBox
+import sys
 import sqlite3
 import bcrypt
-import sys
+from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QLineEdit, QPushButton, 
+                             QVBoxLayout, QHBoxLayout, QFrame, QMessageBox, QGraphicsDropShadowEffect)
+from PyQt5.QtCore import Qt, QPropertyAnimation, QPoint
+from PyQt5.QtGui import QFont, QColor, QPixmap
 
-# IMPORTS
-# Ensure these file names match exactly what you have in your folder
+# --- IMPORT DASHBOARDS ---
+# Ensure these filenames match your local files
 from student_dashboard import StudentDashboard
 from admin_dashboard import AdminDashboard 
 
-class LoginWindow(QtWidgets.QWidget):
+class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("KAU Login")
-        self.setFixedSize(900, 600)
-        self.setStyleSheet("background-color: #e8f0ec;")
+        self.setWindowTitle("KAU Portal | Secure Login")
+        self.setFixedSize(950, 600)
+        
+        # Remove default title bar for a cleaner look (Optional, can comment out)
+        # self.setWindowFlags(Qt.FramelessWindowHint) 
+        self.setAttribute(Qt.WA_TranslucentBackground)
 
-        # Main Layout
-        main_layout = QtWidgets.QHBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Left Panel (Image)
-        self.left_panel = QtWidgets.QLabel()
-        self.left_panel.setMinimumWidth(450)
-        self.left_panel.setAlignment(QtCore.Qt.AlignCenter)
-        
-        # Try to load image, handle failure gracefully
-        pix = QtGui.QPixmap("KAU ENGNEERING DEP.jpg")
-        if not pix.isNull():
-            self.left_panel.setPixmap(pix.scaled(550, 600, QtCore.Qt.KeepAspectRatioByExpanding))
-        else:
-            self.left_panel.setText("KAU Image Not Found")
-            self.left_panel.setStyleSheet("background: #ccc; color: #333; font-weight: bold;")
+        # --- MAIN LAYOUT (Split Screen) ---
+        self.main_layout = QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
 
-        # Right Panel (Form)
-        right_panel = QtWidgets.QFrame()
-        right_panel.setFixedWidth(450)
-        right_panel.setStyleSheet("background: white; border-top-right-radius: 40px; border-bottom-right-radius: 40px;")
+        # 1. Left Panel (Branding)
+        self.setup_left_panel()
         
-        form_layout = QtWidgets.QVBoxLayout(right_panel)
-        form_layout.setContentsMargins(60, 40, 60, 40)
-        form_layout.setSpacing(20)
+        # 2. Right Panel (Login Form)
+        self.setup_right_panel()
+
+    def setup_left_panel(self):
+        self.left_frame = QFrame()
+        self.left_frame.setStyleSheet("""
+            QFrame {
+                background-color: #2c3e50;
+                border-top-left-radius: 15px;
+                border-bottom-left-radius: 15px;
+            }
+        """)
+        layout = QVBoxLayout(self.left_frame)
+        layout.setContentsMargins(40, 0, 40, 0)
+        
+        # Logo / Text
+        lbl_logo = QLabel("KAU")
+        lbl_logo.setStyleSheet("color: white; font-size: 60px; font-weight: bold; font-family: 'Segoe UI';")
+        lbl_logo.setAlignment(Qt.AlignCenter)
+        
+        lbl_title = QLabel("Course Registration\nSystem")
+        lbl_title.setStyleSheet("color: #bdc3c7; font-size: 20px; font-family: 'Segoe UI';")
+        lbl_title.setAlignment(Qt.AlignCenter)
+
+        layout.addStretch()
+        layout.addWidget(lbl_logo)
+        layout.addWidget(lbl_title)
+        layout.addStretch()
+        
+        # Footer
+        lbl_footer = QLabel("Faculty of Engineering\nFall 2025")
+        lbl_footer.setStyleSheet("color: #7f8c8d; font-size: 12px;")
+        lbl_footer.setAlignment(Qt.AlignCenter)
+        layout.addWidget(lbl_footer)
+        layout.addSpacing(20)
+
+        self.main_layout.addWidget(self.left_frame)
+
+    def setup_right_panel(self):
+        self.right_frame = QFrame()
+        self.right_frame.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border-top-right-radius: 15px;
+                border-bottom-right-radius: 15px;
+            }
+        """)
+        layout = QVBoxLayout(self.right_frame)
+        layout.setContentsMargins(60, 60, 60, 60)
+        layout.setSpacing(20)
 
         # Title
-        title = QtWidgets.QLabel("Log In")
-        title.setStyleSheet("font-size: 32px; font-weight: bold; color: #004E89;")
-        title.setAlignment(QtCore.Qt.AlignCenter)
-        form_layout.addWidget(title)
-
-        # Inputs
-        self.email_input = QtWidgets.QLineEdit()
-        self.email_input.setPlaceholderText("Enter Email")
-        self.email_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px;")
+        lbl_welcome = QLabel("Welcome Back")
+        lbl_welcome.setStyleSheet("color: #2c3e50; font-size: 32px; font-weight: bold;")
+        lbl_welcome.setAlignment(Qt.AlignLeft)
         
-        self.password_input = QtWidgets.QLineEdit()
-        self.password_input.setPlaceholderText("Enter Password")
-        self.password_input.setEchoMode(QtWidgets.QLineEdit.Password)
-        self.password_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px;")
+        lbl_sub = QLabel("Please enter your details to sign in.")
+        lbl_sub.setStyleSheet("color: #95a5a6; font-size: 14px;")
+        lbl_sub.setAlignment(Qt.AlignLeft)
 
-        form_layout.addWidget(QtWidgets.QLabel("Email"))
-        form_layout.addWidget(self.email_input)
-        form_layout.addWidget(QtWidgets.QLabel("Password"))
-        form_layout.addWidget(self.password_input)
+        layout.addWidget(lbl_welcome)
+        layout.addWidget(lbl_sub)
+        layout.addSpacing(20)
 
-        # Buttons
-        self.login_btn = QtWidgets.QPushButton("Login")
-        self.login_btn.setStyleSheet("background-color: #1E5631; color: white; padding: 10px; border-radius: 5px; font-weight: bold;")
-        self.login_btn.clicked.connect(self.login_user)
-        
-        form_layout.addWidget(self.login_btn)
-        form_layout.addStretch()
-        
-        main_layout.addWidget(self.left_panel)
-        main_layout.addWidget(right_panel)
+        # Inputs Style
+        input_style = """
+            QLineEdit {
+                border: 2px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 14px;
+                background-color: #f9f9f9;
+            }
+            QLineEdit:focus {
+                border: 2px solid #3498db;
+                background-color: white;
+            }
+        """
 
+        # Username Input
+        self.inp_user = QLineEdit()
+        self.inp_user.setPlaceholderText("University ID or Email")
+        self.inp_user.setStyleSheet(input_style)
+        layout.addWidget(self.inp_user)
+
+        # Password Input
+        self.inp_pass = QLineEdit()
+        self.inp_pass.setPlaceholderText("Password")
+        self.inp_pass.setEchoMode(QLineEdit.Password)
+        self.inp_pass.setStyleSheet(input_style)
+        self.inp_pass.returnPressed.connect(self.login_user) # Allow Enter key to login
+        layout.addWidget(self.inp_pass)
+
+        layout.addSpacing(10)
+
+        # Login Button
+        self.btn_login = QPushButton("Sign In")
+        self.btn_login.setCursor(Qt.PointingHandCursor)
+        self.btn_login.setStyleSheet("""
+            QPushButton {
+                background-color: #2980b9;
+                color: white;
+                font-weight: bold;
+                font-size: 16px;
+                padding: 12px;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #3498db;
+            }
+            QPushButton:pressed {
+                background-color: #1abc9c;
+            }
+        """)
+        self.btn_login.clicked.connect(self.login_user)
+        layout.addWidget(self.btn_login)
+
+        layout.addStretch()
+        self.main_layout.addWidget(self.right_frame)
+
+    # =======================================================
+    # LOGIC: AUTHENTICATION
+    # =======================================================
     def login_user(self):
-        email = self.email_input.text().strip()
-        password = self.password_input.text().strip()
+        user_input = self.inp_user.text().strip()
+        password = self.inp_pass.text().strip()
 
-        if not email or not password:
-            QMessageBox.warning(self, "Error", "Fields cannot be empty.")
+        if not user_input or not password:
+            QMessageBox.warning(self, "Validation Error", "Please fill in all fields.")
             return
 
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
-            # Check for user
-            cur.execute("SELECT id, name, email, password, membership FROM users WHERE email=?", (email,))
+            
+            # --- LOGIC: Check 'users' table by Email OR ID ---
+            # We check if the input is numeric (ID) or string (Email) to optimize, 
+            # or just run an OR query.
+            
+            query = "SELECT id, name, email, password, membership FROM users WHERE email=? OR CAST(id AS TEXT)=?"
+            cur.execute(query, (user_input, user_input))
+            
             user = cur.fetchone()
-            con.close()
 
             if user:
                 user_id, name, db_email, pw_hash, membership = user
                 
-                # Verify password (handles bcrypt or plain text)
-                if isinstance(pw_hash, str):
-                    pw_hash = pw_hash.encode()
+                # Verify Password (bcrypt support with plain text fallback)
+                is_valid = False
+                if isinstance(pw_hash, str): 
+                    pw_bytes = pw_hash.encode() # Convert DB string to bytes
+                else:
+                    pw_bytes = pw_hash
                 
                 try:
-                    valid = bcrypt.checkpw(password.encode(), pw_hash)
+                    # Try comparing as bcrypt hash
+                    is_valid = bcrypt.checkpw(password.encode(), pw_bytes)
                 except ValueError:
-                    # Fallback if password in DB is not hashed (plain text)
-                    valid = (password == pw_hash.decode())
+                    # Fallback: Plain text comparison (for legacy/test users)
+                    is_valid = (password == pw_hash or password == pw_hash.decode())
 
-                if valid:
-                    if membership == "admin":
-                        self.dashboard = AdminDashboard(user_id)
-                    else:
-                        self.dashboard = StudentDashboard(user_id)
-                    
-                    self.dashboard.show()
-                    self.close()
+                if is_valid:
+                    self.handle_successful_login(user_id, name, db_email, membership)
                 else:
-                    QMessageBox.warning(self, "Error", "Invalid Password")
+                    QMessageBox.warning(self, "Access Denied", "Incorrect Password.")
             else:
-                QMessageBox.warning(self, "Error", "User not found")
+                QMessageBox.warning(self, "Access Denied", "User not found. Please check your ID/Email.")
+            
+            con.close()
 
         except Exception as e:
-            QMessageBox.critical(self, "Database Error", str(e))
+            QMessageBox.critical(self, "System Error", f"Database Connection Failed:\n{e}")
+
+    def handle_successful_login(self, user_id, name, email, membership):
+        """
+        Handles post-login logic:
+        1. Syncs 'users' to 'students' table if missing.
+        2. Routes to correct dashboard.
+        """
+        
+        # --- AUTOMATION: Sync Student Profile if Missing ---
+        if membership == "student":
+            try:
+                con = sqlite3.connect("User.db")
+                cur = con.cursor()
+                cur.execute("SELECT id FROM students WHERE id=?", (user_id,))
+                if not cur.fetchone():
+                    # Create profile automatically
+                    cur.execute("INSERT INTO students (id, name, email, program, level) VALUES (?, ?, ?, ?, ?)",
+                                (user_id, name, email, "General Engineering", 1))
+                    con.commit()
+                con.close()
+            except Exception as e:
+                print(f"Auto-sync warning: {e}")
+
+        # --- ROUTING ---
+        if membership.lower() == "admin":
+            self.dashboard = AdminDashboard(user_id)
+        else:
+            self.dashboard = StudentDashboard(user_id)
+        
+        self.dashboard.show()
+        self.close()
 
 if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
+    
+    # Global Font Setup
+    font = QFont("Segoe UI", 10)
+    app.setFont(font)
+    
     window = LoginWindow()
     window.show()
     sys.exit(app.exec_())
