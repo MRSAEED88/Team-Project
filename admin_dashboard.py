@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QPushButton, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QFrame, QStackedWidget,
                              QLineEdit, QAbstractItemView, QMessageBox, QComboBox, 
-                             QSpinBox, QFormLayout)
+                             QSpinBox, QFormLayout, QCheckBox) # Added QCheckBox
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
@@ -17,7 +17,7 @@ class AdminDashboard(QMainWindow):
         self.setWindowTitle("KAU Admin Portal | Fall 2025")
         self.resize(1300, 800)
         
-        # 1. Initialize Admin Logic (Mock credentials since we are already logged in)
+        # 1. Initialize Admin Logic
         self.admin_logic = Admin(user_id, "Admin", "admin@kau.edu.sa", "pass")
 
         # 2. Apply Professional Styles
@@ -39,12 +39,14 @@ class AdminDashboard(QMainWindow):
         # 5. Create Pages
         self.create_dashboard_page()   # Index 0
         self.create_students_page()    # Index 1
-        self.create_courses_page()     # Index 2
+        self.create_courses_page()     # Index 2 (Modified for Multiple Days)
+        self.create_plans_page()       # Index 3 (New: Manage Plans)
 
         # 6. Initial Data Load
         self.load_dashboard_stats()
         self.load_students()
         self.load_courses()
+        self.load_plans()              # New
 
         # Default Page
         self.nav_dashboard.setChecked(True)
@@ -56,12 +58,8 @@ class AdminDashboard(QMainWindow):
     def setup_styles(self):
         self.setStyleSheet("""
             QMainWindow { background-color: #f4f6f9; }
-            
-            /* Sidebar */
             QFrame#Sidebar { background-color: #2c3e50; color: white; border: none; }
             QLabel#LogoLabel { font-size: 22px; font-weight: bold; color: #ecf0f1; padding: 20px; }
-            
-            /* Nav Buttons */
             QPushButton[class="nav-btn"] {
                 background-color: transparent; border: none; color: #bdc3c7;
                 text-align: left; padding: 15px 25px; font-size: 14px;
@@ -69,36 +67,16 @@ class AdminDashboard(QMainWindow):
             }
             QPushButton[class="nav-btn"]:hover { background-color: #34495e; color: white; }
             QPushButton[class="nav-btn"]:checked { background-color: #34495e; color: white; border-left: 4px solid #3498db; }
-            
-            /* Page Titles */
-            QLabel[class="page-title"] { 
-                font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 10px; 
-            }
-            QLabel[class="section-title"] { 
-                font-size: 16px; font-weight: bold; color: #27ae60; margin-top: 10px; 
-            }
-            
-            /* Cards */
-            QFrame[class="card"] { 
-                background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; 
-            }
-            
-            /* Tables */
+            QLabel[class="page-title"] { font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
+            QLabel[class="section-title"] { font-size: 16px; font-weight: bold; color: #27ae60; margin-top: 10px; }
+            QFrame[class="card"] { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; }
             QTableWidget { background-color: white; border: 1px solid #dcdcdc; gridline-color: #ecf0f1; font-size: 13px; }
             QHeaderView::section { background-color: #ecf0f1; padding: 8px; border: none; font-weight: bold; color: #2c3e50; }
-            
-            /* Inputs */
-            QLineEdit, QComboBox, QSpinBox {
-                padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; background: white;
-            }
-            
-            /* Action Buttons */
+            QLineEdit, QComboBox, QSpinBox { padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; background: white; }
             QPushButton[class="action-btn"] { background-color: #2980b9; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }
             QPushButton[class="action-btn"]:hover { background-color: #3498db; }
-            
             QPushButton[class="success-btn"] { background-color: #27ae60; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }
             QPushButton[class="success-btn"]:hover { background-color: #2ecc71; }
-            
             QPushButton[class="danger-btn"] { background-color: #c0392b; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }
             QPushButton[class="danger-btn"]:hover { background-color: #e74c3c; }
         """)
@@ -124,10 +102,12 @@ class AdminDashboard(QMainWindow):
         self.nav_dashboard = self.create_nav_button("Dashboard Overview")
         self.nav_students = self.create_nav_button("Manage Students")
         self.nav_courses = self.create_nav_button("Manage Courses")
+        self.nav_plans = self.create_nav_button("Manage Plans") # NEW BUTTON
         
         layout.addWidget(self.nav_dashboard)
         layout.addWidget(self.nav_students)
         layout.addWidget(self.nav_courses)
+        layout.addWidget(self.nav_plans)
         
         layout.addStretch()
         
@@ -142,6 +122,7 @@ class AdminDashboard(QMainWindow):
         self.nav_dashboard.clicked.connect(lambda: self.switch_page(0, self.nav_dashboard))
         self.nav_students.clicked.connect(lambda: self.switch_page(1, self.nav_students))
         self.nav_courses.clicked.connect(lambda: self.switch_page(2, self.nav_courses))
+        self.nav_plans.clicked.connect(lambda: self.switch_page(3, self.nav_plans))
 
     def create_nav_button(self, text):
         btn = QPushButton(text)
@@ -239,7 +220,7 @@ class AdminDashboard(QMainWindow):
         action_layout.addWidget(self.btn_del_student)
         layout.addLayout(action_layout)
 
-        # ---------- NEW: ADD STUDENT FORM ----------
+        # Add Student Form
         form_frame = QFrame()
         form_frame.setProperty("class", "card")
         form_layout = QFormLayout(form_frame)
@@ -276,12 +257,10 @@ class AdminDashboard(QMainWindow):
         form_layout.addRow(self.btn_add_student)
 
         layout.addWidget(form_frame)
-        # ------------------------------------------
-
         self.content_area.addWidget(page)
 
     # =======================================================
-    # PAGE 3: MANAGE COURSES
+    # PAGE 3: MANAGE COURSES (MODIFIED FOR MULTIPLE DAYS)
     # =======================================================
     def create_courses_page(self):
         page = QWidget()
@@ -335,13 +314,24 @@ class AdminDashboard(QMainWindow):
         col1.addWidget(self.inp_name)
         col1.addWidget(self.inp_credits)
         
-        # Col 2
+        # Col 2 (MODIFIED: Checkboxes for Days)
         col2 = QVBoxLayout()
-        self.inp_day = QComboBox(); self.inp_day.addItems(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"])
+        col2.addWidget(QLabel("Schedule (Select Days)"))
+        
+        days_layout = QHBoxLayout()
+        self.day_checkboxes = [] # List to store checkboxes
+        days_list = ["Sun", "Mon", "Tue", "Wed", "Thu"]
+        
+        for day in days_list:
+            cb = QCheckBox(day)
+            self.day_checkboxes.append(cb)
+            days_layout.addWidget(cb)
+            
+        col2.addLayout(days_layout)
+
         self.inp_start = QSpinBox(); self.inp_start.setRange(8, 20); self.inp_start.setSuffix(":00"); self.inp_start.setPrefix("Start: ")
         self.inp_end = QSpinBox(); self.inp_end.setRange(9, 21); self.inp_end.setSuffix(":00"); self.inp_end.setPrefix("End: ")
-        col2.addWidget(QLabel("Schedule"))
-        col2.addWidget(self.inp_day)
+        
         col2.addWidget(self.inp_start)
         col2.addWidget(self.inp_end)
 
@@ -365,6 +355,76 @@ class AdminDashboard(QMainWindow):
         form_layout.addLayout(grid)
 
         layout.addWidget(form_frame)
+        self.content_area.addWidget(page)
+
+    # =======================================================
+    # PAGE 4: MANAGE PLANS (NEW)
+    # =======================================================
+    def create_plans_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(30, 30, 30, 30)
+
+        # Header
+        title = QLabel("Program Plans Management")
+        title.setProperty("class", "page-title")
+        layout.addWidget(title)
+
+        # --- Filter Section ---
+        filter_frame = QFrame()
+        filter_frame.setProperty("class", "card")
+        filter_layout = QHBoxLayout(filter_frame)
+        
+        self.filter_program = QComboBox()
+        self.filter_program.addItems(["Computer", "Comm", "Power", "Biomedical"])
+        self.filter_program.currentIndexChanged.connect(self.load_plans)
+        
+        self.filter_level = QSpinBox()
+        self.filter_level.setRange(1, 10)
+        self.filter_level.setPrefix("Level: ")
+        self.filter_level.valueChanged.connect(self.load_plans)
+        
+        filter_layout.addWidget(QLabel("Select Program:"))
+        filter_layout.addWidget(self.filter_program)
+        filter_layout.addWidget(QLabel("Select Level:"))
+        filter_layout.addWidget(self.filter_level)
+        filter_layout.addStretch()
+        
+        layout.addWidget(filter_frame)
+
+        # --- Table Section ---
+        self.plans_table = QTableWidget()
+        self.plans_table.setColumnCount(3)
+        self.plans_table.setHorizontalHeaderLabels(["Program", "Level", "Course Code"])
+        self.plans_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.plans_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.plans_table.setAlternatingRowColors(True)
+        layout.addWidget(self.plans_table)
+
+        # --- Add Course to Plan Section ---
+        form_frame = QFrame()
+        form_frame.setProperty("class", "card")
+        form_layout = QHBoxLayout(form_frame)
+        
+        self.combo_plan_course = QComboBox()
+        self.load_course_codes_into_combo()
+        
+        btn_add_plan = QPushButton("Add Course to Plan")
+        btn_add_plan.setProperty("class", "success-btn")
+        btn_add_plan.clicked.connect(self.handle_add_to_plan)
+        
+        btn_del_plan = QPushButton("Remove Selected")
+        btn_del_plan.setProperty("class", "danger-btn")
+        btn_del_plan.clicked.connect(self.handle_delete_from_plan)
+
+        form_layout.addWidget(QLabel("Add Course:"))
+        form_layout.addWidget(self.combo_plan_course)
+        form_layout.addWidget(btn_add_plan)
+        form_layout.addStretch()
+        form_layout.addWidget(btn_del_plan)
+        
+        layout.addWidget(form_frame)
+        
         self.content_area.addWidget(page)
 
     # =======================================================
@@ -417,6 +477,39 @@ class AdminDashboard(QMainWindow):
         except Exception as e:
             print(f"Course Load Error: {e}")
 
+    # --- PLANS LOGIC ---
+    def load_course_codes_into_combo(self):
+        self.combo_plan_course.clear()
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute("SELECT course_code FROM courses")
+            courses = cur.fetchall()
+            con.close()
+            for c in courses:
+                self.combo_plan_course.addItem(c[0])
+        except Exception as e:
+            print(f"Error loading courses: {e}")
+
+    def load_plans(self):
+        self.plans_table.setRowCount(0)
+        prog = self.filter_program.currentText()
+        lvl = self.filter_level.value()
+        
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute("SELECT program, level, course_code FROM program_plans WHERE program=? AND level=?", (prog, lvl))
+            rows = cur.fetchall()
+            con.close()
+
+            for row_idx, row_data in enumerate(rows):
+                self.plans_table.insertRow(row_idx)
+                for col_idx, data in enumerate(row_data):
+                    self.plans_table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
+        except Exception as e:
+            print(f"Plan Load Error: {e}")
+
     # =======================================================
     # HANDLERS
     # =======================================================
@@ -439,9 +532,6 @@ class AdminDashboard(QMainWindow):
                 QMessageBox.warning(self, "Error", msg)
 
     def handle_add_student(self):
-        """
-        Simple create student into `students` table.
-        """
         student_id = self.inp_s_id.text().strip()
         name = self.inp_s_name.text().strip()
         email = self.inp_s_email.text().strip()
@@ -455,46 +545,52 @@ class AdminDashboard(QMainWindow):
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
-            cur.execute(
-                "INSERT INTO students (id, name, email, program, level) VALUES (?, ?, ?, ?, ?)",
-                (student_id, name, email, program, level)
-            )
+            cur.execute("INSERT INTO students (id, name, email, program, level) VALUES (?, ?, ?, ?, ?)", (student_id, name, email, program, level))
             con.commit()
             con.close()
 
             QMessageBox.information(self, "Success", "Student added successfully.")
             self.load_students()
             self.load_dashboard_stats()
-
             self.inp_s_id.clear()
             self.inp_s_name.clear()
             self.inp_s_email.clear()
-
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Database Error: {e}")
 
     def handle_add_course(self):
-        # Gather Data
         code = self.inp_code.text()
         name = self.inp_name.text()
         credits = self.inp_credits.value()
-        day = self.inp_day.currentText()
+        
+        # Gather Days
+        selected_days = []
+        for cb in self.day_checkboxes:
+            if cb.isChecked():
+                selected_days.append(cb.text())
+        
+        if not selected_days:
+            QMessageBox.warning(self, "Error", "Please select at least one day.")
+            return
+        day_str = ", ".join(selected_days) 
+
         start = self.inp_start.value()
         end = self.inp_end.value()
         room = self.inp_room.text()
         cap = self.inp_cap.value()
 
-        # Call Logic
-        success, msg = self.admin_logic.add_course(code, name, credits, day, start, end, room, cap, [])
+        success, msg = self.admin_logic.add_course(code, name, credits, day_str, start, end, room, cap, [])
         
         if success:
             QMessageBox.information(self, "Success", "Course Added Successfully")
             self.load_courses()
             self.load_dashboard_stats()
-            # Clear Inputs
+            self.load_course_codes_into_combo() # Update plans combo
             self.inp_code.clear()
             self.inp_name.clear()
             self.inp_room.clear()
+            for cb in self.day_checkboxes:
+                cb.setChecked(False)
         else:
             QMessageBox.warning(self, "Error", msg)
 
@@ -513,8 +609,59 @@ class AdminDashboard(QMainWindow):
                 QMessageBox.information(self, "Success", msg)
                 self.load_courses()
                 self.load_dashboard_stats()
+                self.load_course_codes_into_combo() # Update plans combo
             else:
                 QMessageBox.warning(self, "Error", msg)
+
+    def handle_add_to_plan(self):
+        prog = self.filter_program.currentText()
+        lvl = self.filter_level.value()
+        code = self.combo_plan_course.currentText()
+        
+        if not code:
+            QMessageBox.warning(self, "Error", "No course selected.")
+            return
+
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute("SELECT * FROM program_plans WHERE program=? AND level=? AND course_code=?", (prog, lvl, code))
+            if cur.fetchone():
+                QMessageBox.warning(self, "Error", f"Course {code} is already in the plan for {prog} Level {lvl}.")
+                con.close()
+                return
+
+            cur.execute("INSERT INTO program_plans (program, level, course_code) VALUES (?, ?, ?)", (prog, lvl, code))
+            con.commit()
+            con.close()
+            
+            QMessageBox.information(self, "Success", f"Added {code} to {prog} Level {lvl}.")
+            self.load_plans()
+        except Exception as e:
+            QMessageBox.critical(self, "Database Error", str(e))
+
+    def handle_delete_from_plan(self):
+        row = self.plans_table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Warning", "Please select a row to remove.")
+            return
+            
+        prog = self.plans_table.item(row, 0).text()
+        lvl = self.plans_table.item(row, 1).text()
+        code = self.plans_table.item(row, 2).text()
+        
+        confirm = QMessageBox.question(self, "Confirm", f"Remove {code} from {prog} Level {lvl}?", QMessageBox.Yes | QMessageBox.No)
+        
+        if confirm == QMessageBox.Yes:
+            try:
+                con = sqlite3.connect("User.db")
+                cur = con.cursor()
+                cur.execute("DELETE FROM program_plans WHERE program=? AND level=? AND course_code=?", (prog, lvl, code))
+                con.commit()
+                con.close()
+                self.load_plans()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", str(e))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
