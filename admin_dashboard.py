@@ -1,70 +1,66 @@
-import sys
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5 import uic
-from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+                             QLabel, QPushButton, QListWidget, QStackedWidget, QFrame)
+from PyQt5.QtCore import Qt
 
-class MainWindow(QMainWindow):
-    def __init__(self):
+class AdminDashboard(QMainWindow):
+    def __init__(self, user_id=None):
         super().__init__()
+        self.setWindowTitle("Admin Dashboard")
+        self.resize(900, 600)
+        self.user_id = user_id
 
+        # --- Main Layout Setup ---
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QHBoxLayout(self.central_widget)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
+
+        # --- Sidebar (Left) ---
+        self.sidebar = QFrame()
+        self.sidebar.setFixedWidth(200)
+        self.sidebar.setStyleSheet("background-color: #2c3e50; color: white;")
+        self.sidebar_layout = QVBoxLayout(self.sidebar)
         
-        uic.loadUi("MainWindow_UI.ui", self)
+        self.lbl_title = QLabel("Admin Panel")
+        self.lbl_title.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px;")
+        self.sidebar_layout.addWidget(self.lbl_title)
 
+        # Menu Buttons
+        self.btn_students = QPushButton("Manage Students")
+        self.btn_courses = QPushButton("Manage Courses")
+        self.btn_logout = QPushButton("Log Out")
         
-        self.leftmenu = self.findChild(QWidget, "leftmenu")
-        self.sidebarList = self.findChild(QListWidget, "sidebarList")
-        self.btnToggleMenu = self.findChild(QPushButton, "btnToggleMenu")
+        # Style sidebar buttons
+        for btn in [self.btn_students, self.btn_courses, self.btn_logout]:
+            btn.setStyleSheet("""
+                QPushButton { text-align: left; padding: 10px; border: none; background: none; color: white; font-size: 14px; }
+                QPushButton:hover { background-color: #34495e; }
+            """)
+            self.sidebar_layout.addWidget(btn)
 
-        
-        self.stackedMain = self.findChild(QStackedWidget, "stackedMain")
-        self.pageStudents = self.findChild(QWidget, "pageStudents")
-        self.pageCourses = self.findChild(QWidget, "pageCourses")
+        self.sidebar_layout.addStretch()
+        self.main_layout.addWidget(self.sidebar)
 
-        
-        self.btnToggleMenu.clicked.connect(self.toggleMenu)
+        # --- Content Area (Right) ---
+        self.content_area = QStackedWidget()
+        self.main_layout.addWidget(self.content_area)
 
-        
-        self.populateSidebar()
+        # Page 1: Students
+        self.page_students = QWidget()
+        student_layout = QVBoxLayout(self.page_students)
+        student_layout.addWidget(QLabel("Student Management Area", styleSheet="font-size: 20px; color: #333;"))
+        student_layout.addStretch()
+        self.content_area.addWidget(self.page_students)
 
-        
-        self.animation = QPropertyAnimation(self.leftmenu, b"minimumWidth")
-        self.animation.setDuration(300)
-        self.animation.setEasingCurve(QEasingCurve.InOutQuad)
+        # Page 2: Courses
+        self.page_courses = QWidget()
+        course_layout = QVBoxLayout(self.page_courses)
+        course_layout.addWidget(QLabel("Course Management Area", styleSheet="font-size: 20px; color: #333;"))
+        course_layout.addStretch()
+        self.content_area.addWidget(self.page_courses)
 
-    
-    #animation
-    
-    def toggleMenu(self):
-        current_width = self.leftmenu.width()
-        expanded = 220
-        collapsed = 60
-
-        if current_width == collapsed:
-            target_width = expanded
-        else:
-            target_width = collapsed
-
-        self.animation.stop()
-        self.animation.setStartValue(current_width)
-        self.animation.setEndValue(target_width)
-        self.animation.start()
-
-    
-    #full sidebar
-    
-    def populateSidebar(self):
-
-        students = []
-        courses = []
-
-        self.sidebarList.addItem("=== Students ===")
-        for s in students:
-            self.sidebarList.addItem("• " + s)
-
-        self.sidebarList.addItem("")
-        self.sidebarList.addItem("=== Courses ===")
-        for c in courses:
-            self.sidebarList.addItem("• " + c)
-
-
+        # --- Connect Buttons ---
+        self.btn_students.clicked.connect(lambda: self.content_area.setCurrentWidget(self.page_students))
+        self.btn_courses.clicked.connect(lambda: self.content_area.setCurrentWidget(self.page_courses))
+        self.btn_logout.clicked.connect(self.close)
