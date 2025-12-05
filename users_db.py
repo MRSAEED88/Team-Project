@@ -189,25 +189,56 @@ def add_to_waitlist(student_id, course_code):
                     (student_id, course_code))
         con.commit()
 def get_all_courses_data():
-    """Fetches all course data required for the RegistrationValidator."""
+    """
+    Fetches all course data required for the Student Dashboard.
+    Fixes the 'TBA' issue by explicitly fetching room and schedule info.
+    """
     with sqlite3.connect('User.db') as con:
+        con.row_factory = sqlite3.Row  # This allows us to use column names
         cur = con.cursor()
+        
+        # 1. Fetch ALL columns we need (including Room and Time)
         cur.execute("""
             SELECT c.course_code, c.course_name, c.credits, c.max_capacity, 
-                   c.day, c.start_time, c.end_time, GROUP_CONCAT(p.prereq_code)
+                   c.day, c.start_time, c.end_time, c.room
             FROM courses c
-            LEFT JOIN prerequisites p ON c.course_code = p.course_code
-            GROUP BY c.course_code
         """)
+        rows = cur.fetchall()
+        
+        # 2. Get Prerequisites
+        cur.execute("SELECT course_code, prereq_code FROM prerequisites")
+        prereqs_map = {}
+        for r in cur.fetchall():
+            if r['course_code'] not in prereqs_map:
+                prereqs_map[r['course_code']] = []
+            prereqs_map[r['course_code']].append(r['prereq_code'])
+
         courses_data = {}
-        for row in cur.fetchall():
-            prereqs = (row[7] or "").split(',') if row[7] else []
-            courses_data[row[0]] = {
-                "name": row[1],
-                "credits": row[2],
-                "max_capacity": row[3],
-                "schedule": [(row[4], row[5], row[6])],
-                "prerequisites": prereqs
+        for row in rows:
+            code = row['course_code']
+            
+            # 3. Format Time (e.g., convert 8 to "08:00")
+            s_time = row['start_time']
+            e_time = row['end_time']
+            try:
+                if isinstance(s_time, int) or (isinstance(s_time, str) and s_time.isdigit()):
+                    s_time = f"{int(s_time):02d}:00"
+                if isinstance(e_time, int) or (isinstance(e_time, str) and e_time.isdigit()):
+                    e_time = f"{int(e_time):02d}:00"
+            except: 
+                pass 
+
+            # 4. Build the Dictionary with ALL keys
+            courses_data[code] = {
+                "name": row['course_name'],
+                "credits": row['credits'],
+                "max_capacity": row['max_capacity'],
+                "day": row['day'],
+                "start_time": s_time,
+                "end_time": e_time,
+                "room": row['room'],  # <--- This is the missing piece!
+                "schedule": [(row['day'], s_time, e_time)],
+                "prerequisites": prereqs_map.get(code, [])
             }
         return courses_data
 
@@ -294,6 +325,16 @@ def delete_course(course_code):
         cur.execute("DELETE FROM prerequisites WHERE course_code=? OR prereq_code=?", (course_code, course_code))
         cur.execute("DELETE FROM program_plans WHERE course_code=?", (course_code,))
         cur.execute("DELETE FROM registration WHERE course_code=?", (course_code,))
+
+        con.commit()
+# ... (Keep your existing setup_database and other functions at the top) ...
+
+# ==========================================
+#  NEW HELPER FUNCTIONS FOR REGISTRATION SYSTEM
+# ==========================================
+
+
+
 
 if __name__ == "__main__":
     # This block now correctly sets up the database and then runs a test.
