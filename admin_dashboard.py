@@ -2,7 +2,7 @@ import sqlite3
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QListWidget, QStackedWidget, 
                              QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
-                             QFormLayout, QLineEdit, QMessageBox, QComboBox, QSpinBox)
+                             QFormLayout, QLineEdit, QMessageBox, QComboBox, QSpinBox, QCheckBox)
 from PyQt5.QtCore import Qt
 
 # Import your logic classes
@@ -179,10 +179,26 @@ class AdminDashboard(QMainWindow):
         # Inputs
         self.inp_code = QLineEdit(); self.inp_code.setPlaceholderText("Code (e.g. EE201)")
         self.inp_name = QLineEdit(); self.inp_name.setPlaceholderText("Course Name")
+        #New change1
         self.inp_credits = QSpinBox(); self.inp_credits.setRange(1, 6)
         
-        self.inp_day = QComboBox(); self.inp_day.addItems(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"])
+        # --- CHANGED: Replace ComboBox with Checkboxes ---
+        self.day_container = QWidget()
+        self.day_layout = QHBoxLayout(self.day_container)
+        self.day_layout.setContentsMargins(0,0,0,0)
+        
+        self.day_checkboxes = []
+        days_list = ["Sun", "Mon", "Tue", "Wed", "Thu"]
+        
+        for d in days_list:
+            chk = QCheckBox(d)
+            self.day_checkboxes.append(chk)
+            self.day_layout.addWidget(chk)
+        # ----------------------------------------------- end
+
         self.inp_start = QSpinBox(); self.inp_start.setRange(8, 20); self.inp_start.setSuffix(":00")
+
+        
         self.inp_end = QSpinBox(); self.inp_end.setRange(9, 21); self.inp_end.setSuffix(":00")
         
         self.inp_room = QLineEdit(); self.inp_room.setPlaceholderText("Room")
@@ -195,9 +211,12 @@ class AdminDashboard(QMainWindow):
         col1.addWidget(QLabel("Credits:")); col1.addWidget(self.inp_credits)
         
         col2 = QVBoxLayout()
-        col2.addWidget(QLabel("Day:")); col2.addWidget(self.inp_day)
+        #new change2
+        col2.addWidget(QLabel("Day:")); col2.addWidget(self.day_container)
+        #-----------------------------------------------------------------------end
         col2.addWidget(QLabel("Start:")); col2.addWidget(self.inp_start)
         col2.addWidget(QLabel("End:")); col2.addWidget(self.inp_end)
+        
         
         col3 = QVBoxLayout()
         col3.addWidget(QLabel("Room:")); col3.addWidget(self.inp_room)
@@ -240,9 +259,23 @@ class AdminDashboard(QMainWindow):
         code = self.inp_code.text()
         name = self.inp_name.text()
         credits = self.inp_credits.value()
-        day = self.inp_day.currentText()
-        start = self.inp_start.value()
-        end = self.inp_end.value()
+        
+        # --- CHANGED: Get days from checkboxes ---
+        selected_days = []
+        for chk in self.day_checkboxes:
+            if chk.isChecked():
+                selected_days.append(chk.text())
+        
+        if not selected_days:
+            QMessageBox.warning(self, "Error", "Please select at least one day.")
+            return
+
+        # Join them: "Sun,Tue"
+        day = ",".join(selected_days)
+        # -----------------------------------------
+
+        start = str(self.inp_start.value()) + ":00" # Ensure time format matches DB
+        end = str(self.inp_end.value()) + ":00"
         room = self.inp_room.text()
         cap = self.inp_cap.value()
 
@@ -254,5 +287,8 @@ class AdminDashboard(QMainWindow):
             self.load_courses() # Refresh table
             self.inp_code.clear()
             self.inp_name.clear()
+            # Uncheck boxes
+            for chk in self.day_checkboxes:
+                chk.setChecked(False)
         else:
             QMessageBox.warning(self, "Error", msg)
