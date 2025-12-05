@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QPushButton, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QFrame, QStackedWidget,
                              QLineEdit, QAbstractItemView, QMessageBox, QComboBox, 
-                             QSpinBox, QFormLayout, QCheckBox) # Added QCheckBox
+                             QSpinBox, QFormLayout, QCheckBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
@@ -39,14 +39,14 @@ class AdminDashboard(QMainWindow):
         # 5. Create Pages
         self.create_dashboard_page()   # Index 0
         self.create_students_page()    # Index 1
-        self.create_courses_page()     # Index 2 (Modified for Multiple Days)
-        self.create_plans_page()       # Index 3 (New: Manage Plans)
+        self.create_courses_page()     # Index 2
+        self.create_plans_page()       # Index 3 (Updated)
 
         # 6. Initial Data Load
         self.load_dashboard_stats()
         self.load_students()
         self.load_courses()
-        self.load_plans()              # New
+        self.load_plans()              # Updated Logic
 
         # Default Page
         self.nav_dashboard.setChecked(True)
@@ -102,7 +102,7 @@ class AdminDashboard(QMainWindow):
         self.nav_dashboard = self.create_nav_button("Dashboard Overview")
         self.nav_students = self.create_nav_button("Manage Students")
         self.nav_courses = self.create_nav_button("Manage Courses")
-        self.nav_plans = self.create_nav_button("Manage Plans") # NEW BUTTON
+        self.nav_plans = self.create_nav_button("Manage Plans")
         
         layout.addWidget(self.nav_dashboard)
         layout.addWidget(self.nav_students)
@@ -260,7 +260,7 @@ class AdminDashboard(QMainWindow):
         self.content_area.addWidget(page)
 
     # =======================================================
-    # PAGE 3: MANAGE COURSES (MODIFIED FOR MULTIPLE DAYS)
+    # PAGE 3: MANAGE COURSES
     # =======================================================
     def create_courses_page(self):
         page = QWidget()
@@ -314,12 +314,12 @@ class AdminDashboard(QMainWindow):
         col1.addWidget(self.inp_name)
         col1.addWidget(self.inp_credits)
         
-        # Col 2 (MODIFIED: Checkboxes for Days)
+        # Col 2
         col2 = QVBoxLayout()
         col2.addWidget(QLabel("Schedule (Select Days)"))
         
         days_layout = QHBoxLayout()
-        self.day_checkboxes = [] # List to store checkboxes
+        self.day_checkboxes = [] 
         days_list = ["Sun", "Mon", "Tue", "Wed", "Thu"]
         
         for day in days_list:
@@ -358,7 +358,7 @@ class AdminDashboard(QMainWindow):
         self.content_area.addWidget(page)
 
     # =======================================================
-    # PAGE 4: MANAGE PLANS (NEW)
+    # PAGE 4: MANAGE PLANS (UPDATED: SHOW ALL LEVELS)
     # =======================================================
     def create_plans_page(self):
         page = QWidget()
@@ -370,7 +370,7 @@ class AdminDashboard(QMainWindow):
         title.setProperty("class", "page-title")
         layout.addWidget(title)
 
-        # --- Filter Section ---
+        # --- Filter Section (Program ONLY) ---
         filter_frame = QFrame()
         filter_frame.setProperty("class", "card")
         filter_layout = QHBoxLayout(filter_frame)
@@ -379,15 +379,10 @@ class AdminDashboard(QMainWindow):
         self.filter_program.addItems(["Computer", "Comm", "Power", "Biomedical"])
         self.filter_program.currentIndexChanged.connect(self.load_plans)
         
-        self.filter_level = QSpinBox()
-        self.filter_level.setRange(1, 10)
-        self.filter_level.setPrefix("Level: ")
-        self.filter_level.valueChanged.connect(self.load_plans)
+        # Note: Level filter removed for display, moved to Add section
         
         filter_layout.addWidget(QLabel("Select Program:"))
         filter_layout.addWidget(self.filter_program)
-        filter_layout.addWidget(QLabel("Select Level:"))
-        filter_layout.addWidget(self.filter_level)
         filter_layout.addStretch()
         
         layout.addWidget(filter_frame)
@@ -406,6 +401,11 @@ class AdminDashboard(QMainWindow):
         form_frame.setProperty("class", "card")
         form_layout = QHBoxLayout(form_frame)
         
+        # New: Target Level Input for Adding
+        self.inp_plan_level = QSpinBox()
+        self.inp_plan_level.setRange(1, 10)
+        self.inp_plan_level.setPrefix("Level: ")
+
         self.combo_plan_course = QComboBox()
         self.load_course_codes_into_combo()
         
@@ -419,6 +419,8 @@ class AdminDashboard(QMainWindow):
 
         form_layout.addWidget(QLabel("Add Course:"))
         form_layout.addWidget(self.combo_plan_course)
+        form_layout.addWidget(QLabel("To:"))
+        form_layout.addWidget(self.inp_plan_level) # Add the level selector here
         form_layout.addWidget(btn_add_plan)
         form_layout.addStretch()
         form_layout.addWidget(btn_del_plan)
@@ -477,7 +479,7 @@ class AdminDashboard(QMainWindow):
         except Exception as e:
             print(f"Course Load Error: {e}")
 
-    # --- PLANS LOGIC ---
+    # --- PLANS LOGIC (UPDATED) ---
     def load_course_codes_into_combo(self):
         self.combo_plan_course.clear()
         try:
@@ -492,14 +494,15 @@ class AdminDashboard(QMainWindow):
             print(f"Error loading courses: {e}")
 
     def load_plans(self):
+        """Loads ALL plans for the selected program, ordered by Level."""
         self.plans_table.setRowCount(0)
         prog = self.filter_program.currentText()
-        lvl = self.filter_level.value()
         
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
-            cur.execute("SELECT program, level, course_code FROM program_plans WHERE program=? AND level=?", (prog, lvl))
+            # Changed Query: No longer filters by level, only Program. Order by Level.
+            cur.execute("SELECT program, level, course_code FROM program_plans WHERE program=? ORDER BY level ASC", (prog,))
             rows = cur.fetchall()
             con.close()
 
@@ -585,7 +588,7 @@ class AdminDashboard(QMainWindow):
             QMessageBox.information(self, "Success", "Course Added Successfully")
             self.load_courses()
             self.load_dashboard_stats()
-            self.load_course_codes_into_combo() # Update plans combo
+            self.load_course_codes_into_combo()
             self.inp_code.clear()
             self.inp_name.clear()
             self.inp_room.clear()
@@ -609,13 +612,13 @@ class AdminDashboard(QMainWindow):
                 QMessageBox.information(self, "Success", msg)
                 self.load_courses()
                 self.load_dashboard_stats()
-                self.load_course_codes_into_combo() # Update plans combo
+                self.load_course_codes_into_combo()
             else:
                 QMessageBox.warning(self, "Error", msg)
 
     def handle_add_to_plan(self):
         prog = self.filter_program.currentText()
-        lvl = self.filter_level.value()
+        lvl = self.inp_plan_level.value() # Get level from the specific input, not the filter
         code = self.combo_plan_course.currentText()
         
         if not code:
@@ -636,7 +639,7 @@ class AdminDashboard(QMainWindow):
             con.close()
             
             QMessageBox.information(self, "Success", f"Added {code} to {prog} Level {lvl}.")
-            self.load_plans()
+            self.load_plans() # Reload the table to show the new entry
         except Exception as e:
             QMessageBox.critical(self, "Database Error", str(e))
 
