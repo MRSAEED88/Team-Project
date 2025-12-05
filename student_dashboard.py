@@ -1,63 +1,46 @@
 import sqlite3
 from PyQt5.QtWidgets import QMainWindow
+# Import the UI class from your generated file
+from studentdashboardUi_ import Ui_StudentDashboard 
 
-class StudentDashboard(QMainWindow):
+class StudentDashboard(QMainWindow, Ui_StudentDashboard):
     def __init__(self, user_id):
         super().__init__()
-        self.setupUi(self)
-
+        # This sets up the UI defined in studentdashboardUi_.py
+        self.setupUi(self) 
+        
         self.user_id = user_id
         self.load_student_data()
+        
+        # Connect buttons (Example)
+        # self.registerButton.clicked.connect(self.register_course)
 
     def load_student_data(self):
-        con = sqlite3.connect("User.db")
-        cur = con.cursor()
+        # Ensure User.db exists and has the correct schema
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
 
-        cur.execute("SELECT id, name, email, program, level FROM users WHERE id=?", (self.user_id,))
-        student = cur.fetchone()
+            # Assuming your table has these columns. Adjust if necessary.
+            cur.execute("SELECT name, email, program, level FROM users WHERE id=?", (self.user_id,))
+            student = cur.fetchone()
+            con.close()
 
-        con.close()
+            if student is None:
+                self.studentName.setText("Student Name: Unknown")
+                return
 
-        if student is None:
-            self.student_name_label.setText("Unknown")
-            return
+            name, email, program, level = student
 
-        _, name, email, program, level = student
+            # Update the labels defined in studentdashboardUi_.py
+            self.studentName.setText(f"Student Name: {name}")
+            # You need to add an ID label to your DB logic if you want to show it
+            self.studentID.setText(f"Student ID: {self.user_id}") 
+            self.studentMajor.setText(f"Major: {program}")
+            
+            # Note: You have email and level in DB, but not in the UI file provided.
+            # You can add them to the UI or ignore them.
 
-        self.student_name_label.setText(f"Name: {name}")
-        self.student_email_label.setText(f"Email: {email}")
-        self.student_program_label.setText(f"Program: {program}")
-        self.student_level_label.setText(f"Level: {level}")
-
-
-class StudentDashboard(QWidget):
-    def __init__(self, user_id):
-        super().__init__()
-
-        self.user_id = user_id
-
-        layout = QVBoxLayout()
-
-        self.welcome_label = QLabel("Welcome Student")
-        layout.addWidget(self.welcome_label)
-
-        self.registered_label = QLabel("Registered Courses")
-        layout.addWidget(self.registered_label)
-
-        self.registered_list = QListWidget()
-        self.registered_list.addItem("No registered courses yet")
-        layout.addWidget(self.registered_list)
-
-        self.available_label = QLabel("Available Courses")
-        layout.addWidget(self.available_label)
-
-        self.available_list = QListWidget()
-        self.available_list.addItem("Course 1")
-        self.available_list.addItem("Course 2")
-        self.available_list.addItem("Course 3")
-        layout.addWidget(self.available_list)
-
-        self.register_button = QPushButton("Register")
-        layout.addWidget(self.register_button)
-
-        self.setLayout(layout)
+        except Exception as e:
+            print(f"Database Error: {e}")
+            self.studentName.setText("Database Error")
