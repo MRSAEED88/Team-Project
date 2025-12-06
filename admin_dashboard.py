@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QPushButton, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QFrame, QStackedWidget,
                              QLineEdit, QAbstractItemView, QMessageBox, QComboBox, 
-                             QSpinBox, QFormLayout, QCheckBox)
+                             QSpinBox, QFormLayout, QCheckBox, QFileDialog) # Added QFileDialog
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
@@ -167,6 +167,7 @@ class AdminDashboard(QMainWindow):
         l.setContentsMargins(20, 20, 20, 20)
         
         t = QLabel(title)
+        t.setStyleSheet("color: #7f8c8d; font-size: 14px; font-weight: bold;")
         v = QLabel(value)
         v.setStyleSheet("color: #2c3e50; font-size: 28px; font-weight: bold;")
         
@@ -263,13 +264,34 @@ class AdminDashboard(QMainWindow):
             ["Code", "Name", "Credits", "Day", "Start", "End", "Room", "Cap"]
         )
         self.course_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.course_table.setSelectionBehavior(QAbstractItemView.SelectRows) # Select whole rows
         layout.addWidget(self.course_table)
 
+        # --- ACTION BAR (IMPORT & DELETE) ---
+        action_layout = QHBoxLayout()
+        
+        # Import Button
+        self.btn_import = QPushButton("Import CSV")
+        self.btn_import.setProperty("class", "action-btn")
+        self.btn_import.clicked.connect(self.handle_import_csv)
+        action_layout.addWidget(self.btn_import)
+        
+        action_layout.addStretch()
+
+        # Delete Button
+        self.btn_del_course = QPushButton("Delete Selected Course")
+        self.btn_del_course.setProperty("class", "danger-btn")
+        self.btn_del_course.clicked.connect(self.handle_delete_course)
+        action_layout.addWidget(self.btn_del_course)
+
+        layout.addLayout(action_layout)
+
+        # --- ADD COURSE FORM ---
         form_frame = QFrame()
         form_frame.setProperty("class", "card")
         f = QVBoxLayout(form_frame)
 
-        lbl_add = QLabel("Add New Course")
+        lbl_add = QLabel("Add New Course (Manually)")
         lbl_add.setProperty("class", "section-title")
         f.addWidget(lbl_add)
 
@@ -314,6 +336,7 @@ class AdminDashboard(QMainWindow):
         self.inp_cap.setRange(10, 100)
 
         self.btn_add_course = QPushButton("Add Course")
+        self.btn_add_course.setProperty("class", "success-btn")
         self.btn_add_course.clicked.connect(self.handle_add_course)
 
         col3.addWidget(QLabel("Location"))
@@ -359,6 +382,7 @@ class AdminDashboard(QMainWindow):
         self.plans_table.setColumnCount(3)
         self.plans_table.setHorizontalHeaderLabels(["Program", "Level", "Course Code"])
         self.plans_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.plans_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         layout.addWidget(self.plans_table)
 
         form_frame = QFrame()
@@ -507,13 +531,13 @@ class AdminDashboard(QMainWindow):
 
             # USERS
             cur.execute("""
-                INSERT INTO users (id, name, email, password, membership)
+                INSERT INTO users (id, name, email, password, membership) 
                 VALUES (?, ?, ?, ?, ?)
             """, (student_id, name, email, password, "student"))
 
             # STUDENTS
             cur.execute("""
-                INSERT INTO students (id, name, email, program, level)
+                INSERT INTO students (id, name, email, program, level) 
                 VALUES (?, ?, ?, ?, ?)
             """, (student_id, name, email, program, level))
 
@@ -558,7 +582,7 @@ class AdminDashboard(QMainWindow):
             QMessageBox.information(self, "Success", "Course Added.")
             self.load_courses()
             self.load_course_codes_into_combo()
-
+            
             self.inp_code.clear()
             self.inp_name.clear()
             self.inp_room.clear()
@@ -577,9 +601,9 @@ class AdminDashboard(QMainWindow):
         code = self.course_table.item(row, 0).text()
 
         confirm = QMessageBox.question(
-            self,
-            "Confirm",
-            f"Delete course {code}?",
+            self, 
+            "Confirm", 
+            f"Delete course {code}?", 
             QMessageBox.Yes | QMessageBox.No
         )
 
@@ -592,6 +616,30 @@ class AdminDashboard(QMainWindow):
                 self.load_course_codes_into_combo()
             else:
                 QMessageBox.warning(self, "Error", msg)
+
+    # --- NEW: IMPORT HANDLER ---
+    def handle_import_csv(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Course CSV", "", "CSV Files (*.csv);;All Files (*)")
+        
+        if file_path:
+            # Requires Admin.py to have the import_courses_from_csv method
+            try:
+                success, summary, error_list = self.admin_logic.import_courses_from_csv(file_path)
+                
+                if success:
+                    msg = summary
+                    if error_list:
+                        msg += "\n\nSample Errors:\n" + "\n".join(error_list[:5])
+                    
+                    QMessageBox.information(self, "Import Result", msg)
+                    self.load_courses()             
+                    self.load_dashboard_stats()     
+                    self.load_course_codes_into_combo() 
+                else:
+                    QMessageBox.critical(self, "Import Failed", summary)
+            except AttributeError:
+                 QMessageBox.critical(self, "Error", "Your Admin.py file is missing the 'import_courses_from_csv' method.\nPlease update Admin.py first.")
+
 
     def handle_add_to_plan(self):
         prog = self.filter_program.currentText()
