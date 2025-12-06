@@ -5,26 +5,24 @@ class RegistrationValidator:
         self.max_credits = max_credits
         self.min_credits = min_credits
 
-    
-        #check that all prerequisites for selected courses are completed
-
+    # -----------------------------------------------------------
+    # check that all prerequisites for selected courses are completed
+    # -----------------------------------------------------------
     def check_prerequisites(self, selected_courses, completed_courses):
-        #Check if the course exists in the system.
+        # Check if the course exists in the system.
         for course in selected_courses: 
             if course not in self.courses_data:
                 return False, f"Course {course} does not exist."
-            # 
+            
             prereqs = self.courses_data[course].get("prerequisites", [])
             for prereq in prereqs:
                 if prereq not in completed_courses:
                     return False, f"Cannot register for {course}: prerequisite {prereq} not completed."
         return True, "Prerequisites OK."
     
-
-    #                   Sum the credit hours of the courses to be registered, and confirm that the total is 
-    # within the allowed maximum and minimum.
-
-
+    # -----------------------------------------------------------
+    # Check Credit Hours
+    # -----------------------------------------------------------
     def check_credit_hours(self, selected_courses):
         total_credits = sum(self.courses_data[course]["credits"] for course in selected_courses)
         if total_credits < self.min_credits:
@@ -33,13 +31,14 @@ class RegistrationValidator:
             return False, f"Credit hours too high ({total_credits}). Maximum is {self.max_credits}."
         return True, "Credit hours OK."
 
+    # -----------------------------------------------------------
+    # Check Program Plan
+    # -----------------------------------------------------------
     def check_program_plan(self, selected_courses, student_program, student_level):
         """
         Checks if the course belongs to the student's Program.
-        UPDATED: Allows courses from ANY level within that program.
+        Allows courses from ANY level within that program.
         """
-        # Get the dictionary of all levels for this specific program
-        # Structure: {1: ['EE201'], 2: ['EE250'], ...}
         program_levels = self.program_plan.get(student_program, {})
 
         # Flatten into a single list of all allowed courses for this Major
@@ -53,14 +52,19 @@ class RegistrationValidator:
         
         return True, "Program plan OK."
 
+    # -----------------------------------------------------------
+    # Check Schedule Conflicts
+    # -----------------------------------------------------------
     def check_schedule_conflicts(self, selected_courses):
         # Helper to convert HH:MM to minutes
         def to_minutes(t_str):
-            h, m = map(int, t_str.split(':'))
-            return h * 60 + m
+            try:
+                h, m = map(int, t_str.split(':'))
+                return h * 60 + m
+            except:
+                return 0
 
         # 1. Build a list of time slots for all selected courses
-        # Structure: {'CourseCode': [('Day', StartMin, EndMin), ...]}
         course_slots = {}
         
         for course in selected_courses:
@@ -68,18 +72,17 @@ class RegistrationValidator:
             slots = []
             for item in schedule_list:
                 # item is (DaysString, StartStr, EndStr) -> e.g., ('Sun/Tue', '10:00', '11:20')
+                if len(item) < 3: continue
                 days_str, start_str, end_str = item
                 
-                # --- Modification Here ---
-                # We normalize the separator (replace / with ,) and split to handle each day individually.
-                # This ensures "Sun/Tue" creates two separate checks: one for Sun, one for Tue.
+                # Normalize separator and split
                 individual_days = days_str.replace('/', ',').split(',')
                 
                 start_min = to_minutes(start_str)
                 end_min = to_minutes(end_str)
 
                 for day in individual_days:
-                    day = day.strip() # Remove any extra whitespace
+                    day = day.strip() 
                     if day:
                         slots.append((day, start_min, end_min))
             
@@ -102,23 +105,19 @@ class RegistrationValidator:
 
         return True, "No schedule conflicts."
 
-    def check_capacity(self, selected_courses, current_enrollments):
-        for course in selected_courses:
-            max_cap = self.courses_data[course].get("max_capacity", 0)
-            enrolled = current_enrollments.get(course, 0)
-            if enrolled >= max_cap:
-                return False, f"{course} is full."
-        return True, "Capacity OK."
-
-    def validate_registration(self, selected_courses, completed_courses, student_program,student_level, current_enrollments):
+    # -----------------------------------------------------------
+    # MAIN VALIDATION FUNCTION
+    # -----------------------------------------------------------
+    def validate_registration(self, selected_courses, completed_courses, student_program, student_level, current_enrollments):
         checks = [
             self.check_prerequisites(selected_courses, completed_courses),
             self.check_credit_hours(selected_courses),
             self.check_program_plan(selected_courses, student_program, student_level),
-            self.check_schedule_conflicts(selected_courses),
-            self.check_capacity(selected_courses, current_enrollments)
+            self.check_schedule_conflicts(selected_courses)
+            # REMOVED check_capacity FROM HERE
+            # We let the RegistrationSystem handle capacity so it can trigger the waitlist.
         ]
         for result, msg in checks:
             if result == False:
                 return False, msg
-        return True, "Registration successful!"
+        return True, "Validation successful!"
