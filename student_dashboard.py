@@ -172,6 +172,8 @@ class RegistrationTab(QWidget):
 # =============================================================================
 # TAB 3: SCHEDULE (Visual & Lists)
 # =============================================================================
+# [In student_dashboard.py]
+
 class ScheduleTab(QWidget):
     def __init__(self, parent_dashboard):
         super().__init__()
@@ -233,47 +235,76 @@ class ScheduleTab(QWidget):
         my_codes = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
         data = self.dash.logic_system.courses_data
         colors = ["#e74c3c", "#3498db", "#2ecc71", "#9b59b6", "#f1c40f", "#e67e22"]
-        d_map = {"Sunday":0, "Monday":1, "Tuesday":2, "Wednesday":3, "Thursday":4, "Sun":0, "Mon":1, "Tue":2, "Wed":3, "Thu":4}
+        
+        # Mapping for day names
+        d_map = {"Sunday":0, "Monday":1, "Tuesday":2, "Wednesday":3, "Thursday":4, 
+                 "Sun":0, "Mon":1, "Tue":2, "Wed":3, "Thu":4}
+        
         color_i = 0
         tot_creds = 0
 
         for c in my_codes:
             d = data.get(c, {})
-            name = d.get('name', 'Unknown'); room = d.get('room', 'TBA')
+            name = d.get('name', 'Unknown')
+            room = d.get('room', 'TBA')
             tot_creds += d.get('credits', 0)
             
-            day = str(d.get('day')).strip()
+            # 1. Get the raw day string (e.g., "Sun, Tue" or "Mon/Wed")
+            raw_day_str = str(d.get('day', '')).strip()
             start = d.get('start_time')
             end = d.get('end_time')
 
-            # List
+            # List View Update
             r = self.list.rowCount()
             self.list.insertRow(r)
             self.list.setItem(r, 0, QTableWidgetItem(str(c)))
             self.list.setItem(r, 1, QTableWidgetItem(name))
-            self.list.setItem(r, 2, QTableWidgetItem(f"{day} {start}"))
+            self.list.setItem(r, 2, QTableWidgetItem(f"{raw_day_str} {start}"))
             self.list.setItem(r, 3, QTableWidgetItem(room))
 
-            # Calendar
-            if day in d_map and start:
-                try:
-                    col = d_map[day]
-                    row_s = int(str(start).split(':')[0]) - 8
-                    dur = int(str(end).split(':')[0]) - (row_s + 8) if end else 1
-                    if 0 <= row_s < 11:
-                        item = QTableWidgetItem(f"{c}\n{room}")
-                        item.setBackground(QBrush(QColor(colors[color_i % 6])))
-                        item.setForeground(QBrush(Qt.white))
-                        item.setTextAlignment(Qt.AlignCenter)
-                        for i in range(dur):
-                            if row_s + i < 11: self.cal.setItem(row_s + i, col, QTableWidgetItem(item))
-                        color_i += 1
-                except: pass
+            # 2. Calendar View Update (The Fix)
+            if start and end:
+                # Normalize separators: replace '/' with ',' just in case CSV used slashes
+                normalized_days = raw_day_str.replace('/', ',')
+                
+                # Split into a list: "Sun, Tue" -> ["Sun", "Tue"]
+                day_list = [x.strip() for x in normalized_days.split(',')]
+
+                for single_day in day_list:
+                    if single_day in d_map:
+                        try:
+                            col = d_map[single_day]
+                            # Calculate Start Row (assuming 8:00 is index 0)
+                            s_hour = int(str(start).split(':')[0])
+                            row_s = s_hour - 8
+                            
+                            # Calculate Duration
+                            e_hour = int(str(end).split(':')[0])
+                            dur = e_hour - s_hour
+                            if dur < 1: dur = 1 # Minimum 1 hour block
+                            
+                            # Paint Cells
+                            if 0 <= row_s < 11:
+                                item = QTableWidgetItem(f"{c}\n{room}")
+                                item.setBackground(QBrush(QColor(colors[color_i % 6])))
+                                item.setForeground(QBrush(Qt.white))
+                                item.setTextAlignment(Qt.AlignCenter)
+                                
+                                # Loop to fill duration (e.g. 2 hour lab)
+                                for i in range(dur):
+                                    if row_s + i < 11: 
+                                        self.cal.setItem(row_s + i, col, QTableWidgetItem(item))
+                        except Exception as e:
+                            print(f"Error drawing {c} on {single_day}: {e}")
+                
+                color_i += 1
         
+        # Update Total Credits in Overview
         try:
             self.dash.tab_overview.card_credits.layout().itemAt(1).widget().setText(f"{tot_creds} / 18")
         except: pass
 
+        # Load Waitlist Data
         con = sqlite3.connect("User.db")
         cur = con.cursor()
         cur.execute("SELECT course_code, timestamp FROM waitlist WHERE student_id=?", (self.dash.user_id,))
@@ -525,6 +556,6 @@ class StudentDashboard(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
-    window = StudentDashboard(user_id=1) 
+    window = StudentDashboard(user_id=2454896)  # Example user ID
     window.show()
     sys.exit(app.exec_())
