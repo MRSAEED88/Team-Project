@@ -1,6 +1,7 @@
 import csv
 from User import User
 import users_db
+import sqlite3
 
 class Admin(User):
     def __init__(self, user_id, name, email, password):
@@ -86,6 +87,13 @@ class Admin(User):
             return True, "Student deleted successfully."
         except Exception as e: return False, f"Database Error: {e}"
 
+# ============================================================
+    #                 INTERNAL: CHECK COURSE EXISTS
+    # ============================================================
     def _course_exists(self, course_code):
-        search_engine = users_db.search(course_code, table="courses", search_by="course_code")
-        return search_engine.fetch() is not None
+        # We perform a direct SQL query for an EXACT match, 
+        # bypassing the fuzzy search engine to avoid false positives.
+        with sqlite3.connect('User.db') as con:
+            cur = con.cursor()
+            cur.execute("SELECT 1 FROM courses WHERE course_code = ?", (course_code,))
+            return cur.fetchone() is not None
