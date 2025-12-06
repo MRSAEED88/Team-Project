@@ -1,22 +1,29 @@
 import sys
 import sqlite3
-from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QPushButton, QTableWidget, 
-                             QTableWidgetItem, QHeaderView, QFrame, QStackedWidget,
-                             QLineEdit, QAbstractItemView, QMessageBox, QComboBox, 
-                             QSpinBox, QFormLayout, QCheckBox, QFileDialog) # Added QFileDialog
+from PyQt5.QtWidgets import (
+    QMainWindow, QApplication, QWidget, QVBoxLayout,
+    QHBoxLayout, QLabel, QPushButton, QTableWidget,
+    QTableWidgetItem, QHeaderView, QFrame, QStackedWidget,
+    QLineEdit, QAbstractItemView, QMessageBox, QComboBox,
+    QSpinBox, QFormLayout, QCheckBox, QFileDialog, QListWidget
+)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 # --- IMPORT ADMIN LOGIC ---
 from Admin import Admin
 
+
 class AdminDashboard(QMainWindow):
     def __init__(self, user_id=None):
         super().__init__()
         self.setWindowTitle("KAU Admin Portal | Fall 2025")
         self.resize(1300, 800)
-        
+
+        # حالة تعديل الكورس
+        self.edit_mode = False
+        self.current_edit_code = None
+
         # 1. Initialize Admin Logic
         self.admin_logic = Admin(user_id, "Admin", "admin@kau.edu.sa", "pass")
 
@@ -32,7 +39,7 @@ class AdminDashboard(QMainWindow):
 
         # 4. Build UI Components
         self.setup_sidebar()
-        
+
         self.content_area = QStackedWidget()
         self.main_layout.addWidget(self.content_area)
 
@@ -88,7 +95,7 @@ class AdminDashboard(QMainWindow):
         self.sidebar = QFrame()
         self.sidebar.setObjectName("Sidebar")
         self.sidebar.setFixedWidth(240)
-        
+
         layout = QVBoxLayout(self.sidebar)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
@@ -102,7 +109,7 @@ class AdminDashboard(QMainWindow):
         self.nav_students = self.create_nav_button("Manage Students")
         self.nav_courses = self.create_nav_button("Manage Courses")
         self.nav_plans = self.create_nav_button("Manage Plans")
-        
+
         layout.addWidget(self.nav_dashboard)
         layout.addWidget(self.nav_students)
         layout.addWidget(self.nav_courses)
@@ -140,7 +147,7 @@ class AdminDashboard(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(30, 30, 30, 30)
-        
+
         title = QLabel("System Overview")
         title.setProperty("class", "page-title")
         layout.addWidget(title)
@@ -150,11 +157,11 @@ class AdminDashboard(QMainWindow):
 
         self.card_students = self.create_info_card("Total Students", "Loading...", "#2980b9")
         self.card_courses = self.create_info_card("Active Courses", "Loading...", "#27ae60")
-        
+
         cards_layout.addWidget(self.card_students)
         cards_layout.addWidget(self.card_courses)
         cards_layout.addStretch()
-        
+
         layout.addLayout(cards_layout)
         layout.addStretch()
         self.content_area.addWidget(page)
@@ -165,12 +172,12 @@ class AdminDashboard(QMainWindow):
         card.setStyleSheet(f"border-top: 4px solid {color}; background: white; border-radius: 8px;")
         l = QVBoxLayout(card)
         l.setContentsMargins(20, 20, 20, 20)
-        
+
         t = QLabel(title)
         t.setStyleSheet("color: #7f8c8d; font-size: 14px; font-weight: bold;")
         v = QLabel(value)
         v.setStyleSheet("color: #2c3e50; font-size: 28px; font-weight: bold;")
-        
+
         l.addWidget(t)
         l.addWidget(v)
         return card
@@ -200,7 +207,20 @@ class AdminDashboard(QMainWindow):
         self.student_table.setHorizontalHeaderLabels(["ID", "Name", "Email", "Program", "Level"])
         self.student_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.student_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.student_table.setAlternatingRowColors(True)
+        self.student_table.verticalHeader().setVisible(False)
         layout.addWidget(self.student_table)
+
+        # Action Bar (Show Password)
+        action_layout = QHBoxLayout()
+        action_layout.addStretch()
+
+        self.btn_show_password = QPushButton("Show Password")
+        self.btn_show_password.setProperty("class", "action-btn")
+        self.btn_show_password.clicked.connect(self.handle_show_password)
+        action_layout.addWidget(self.btn_show_password)
+
+        layout.addLayout(action_layout)
 
         # Add Student Form
         form_frame = QFrame()
@@ -226,7 +246,6 @@ class AdminDashboard(QMainWindow):
         self.inp_s_level = QSpinBox()
         self.inp_s_level.setRange(1, 10)
 
-        # --- ADD PASSWORD FIELD HERE ---
         self.inp_s_password = QLineEdit()
         self.inp_s_password.setEchoMode(QLineEdit.Password)
         self.inp_s_password.setPlaceholderText("Enter password for student")
@@ -258,27 +277,33 @@ class AdminDashboard(QMainWindow):
         title.setProperty("class", "page-title")
         layout.addWidget(title)
 
+        # TABLE
         self.course_table = QTableWidget()
         self.course_table.setColumnCount(8)
         self.course_table.setHorizontalHeaderLabels(
-            ["Code", "Name", "Credits", "Day", "Start", "End", "Room", "Cap"]
+            ["Code", "Name", "Credits", "Day(s)", "Start", "End", "Room", "Cap"]
         )
         self.course_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.course_table.setSelectionBehavior(QAbstractItemView.SelectRows) # Select whole rows
+        self.course_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.course_table.setAlternatingRowColors(True)
+        self.course_table.verticalHeader().setVisible(False)
         layout.addWidget(self.course_table)
 
-        # --- ACTION BAR (IMPORT & DELETE) ---
+        # ACTION BAR (IMPORT / LOAD / DELETE)
         action_layout = QHBoxLayout()
-        
-        # Import Button
+
         self.btn_import = QPushButton("Import CSV")
         self.btn_import.setProperty("class", "action-btn")
         self.btn_import.clicked.connect(self.handle_import_csv)
         action_layout.addWidget(self.btn_import)
-        
+
+        self.btn_load_course = QPushButton("Load Selected for Edit")
+        self.btn_load_course.setProperty("class", "action-btn")
+        self.btn_load_course.clicked.connect(self.handle_load_course_for_edit)
+        action_layout.addWidget(self.btn_load_course)
+
         action_layout.addStretch()
 
-        # Delete Button
         self.btn_del_course = QPushButton("Delete Selected Course")
         self.btn_del_course.setProperty("class", "danger-btn")
         self.btn_del_course.clicked.connect(self.handle_delete_course)
@@ -286,32 +311,35 @@ class AdminDashboard(QMainWindow):
 
         layout.addLayout(action_layout)
 
-        # --- ADD COURSE FORM ---
+        # ADD / EDIT COURSE FORM
         form_frame = QFrame()
         form_frame.setProperty("class", "card")
         f = QVBoxLayout(form_frame)
 
-        lbl_add = QLabel("Add New Course (Manually)")
+        lbl_add = QLabel("Add / Edit Course")
         lbl_add.setProperty("class", "section-title")
         f.addWidget(lbl_add)
 
         grid = QHBoxLayout()
 
-        # Column 1
+        # Column 1: Details
         col1 = QVBoxLayout()
+        col1.addWidget(QLabel("Details"))
         self.inp_code = QLineEdit()
+        self.inp_code.setPlaceholderText("Code (e.g. EE201)")
         self.inp_name = QLineEdit()
+        self.inp_name.setPlaceholderText("Course Name")
         self.inp_credits = QSpinBox()
         self.inp_credits.setRange(1, 6)
-        col1.addWidget(QLabel("Details"))
+        self.inp_credits.setPrefix("Credits: ")
+
         col1.addWidget(self.inp_code)
         col1.addWidget(self.inp_name)
         col1.addWidget(self.inp_credits)
 
-        # Column 2
+        # Column 2: Schedule
         col2 = QVBoxLayout()
         col2.addWidget(QLabel("Schedule (Select Days)"))
-
         days_layout = QHBoxLayout()
         self.day_checkboxes = []
         days_list = ["Sun", "Mon", "Tue", "Wed", "Thu"]
@@ -323,26 +351,56 @@ class AdminDashboard(QMainWindow):
 
         self.inp_start = QSpinBox()
         self.inp_start.setRange(8, 20)
+        self.inp_start.setPrefix("Start: ")
+        self.inp_start.setSuffix(":00")
+
         self.inp_end = QSpinBox()
         self.inp_end.setRange(9, 21)
+        self.inp_end.setPrefix("End: ")
+        self.inp_end.setSuffix(":00")
 
         col2.addWidget(self.inp_start)
         col2.addWidget(self.inp_end)
 
-        # Column 3
+        # Column 3: Location + Prereqs + Buttons
         col3 = QVBoxLayout()
+        col3.addWidget(QLabel("Location"))
         self.inp_room = QLineEdit()
+        self.inp_room.setPlaceholderText("Room (e.g. 25-101)")
         self.inp_cap = QSpinBox()
         self.inp_cap.setRange(10, 100)
+        self.inp_cap.setPrefix("Cap: ")
 
-        self.btn_add_course = QPushButton("Add Course")
-        self.btn_add_course.setProperty("class", "success-btn")
-        self.btn_add_course.clicked.connect(self.handle_add_course)
-
-        col3.addWidget(QLabel("Location"))
         col3.addWidget(self.inp_room)
         col3.addWidget(self.inp_cap)
+
+        # Prerequisites UI
+        col3.addWidget(QLabel("Prerequisites"))
+        self.prereq_combo = QComboBox()
+        self.refresh_prereq_combo()   # load course codes into combo
+        col3.addWidget(self.prereq_combo)
+
+        self.btn_add_prereq = QPushButton("Add Prerequisite")
+        self.btn_add_prereq.setProperty("class", "action-btn")
+        self.btn_add_prereq.clicked.connect(self.handle_add_prereq)
+        col3.addWidget(self.btn_add_prereq)
+
+        self.prereq_list = QListWidget()
+        self.prereq_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.prereq_list.itemDoubleClicked.connect(self.handle_remove_prereq_item)
+        col3.addWidget(self.prereq_list)
+
+        # Buttons
+        self.btn_add_course = QPushButton("Add New Course")
+        self.btn_add_course.setProperty("class", "success-btn")
+        self.btn_add_course.clicked.connect(self.handle_add_course)
         col3.addWidget(self.btn_add_course)
+
+        self.btn_update_course = QPushButton("Save Changes")
+        self.btn_update_course.setProperty("class", "action-btn")
+        self.btn_update_course.setEnabled(False)
+        self.btn_update_course.clicked.connect(self.handle_update_course)
+        col3.addWidget(self.btn_update_course)
 
         grid.addLayout(col1)
         grid.addLayout(col2)
@@ -350,6 +408,7 @@ class AdminDashboard(QMainWindow):
 
         f.addLayout(grid)
         layout.addWidget(form_frame)
+
         self.content_area.addWidget(page)
 
     # =======================================================
@@ -383,6 +442,8 @@ class AdminDashboard(QMainWindow):
         self.plans_table.setHorizontalHeaderLabels(["Program", "Level", "Course Code"])
         self.plans_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.plans_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.plans_table.setAlternatingRowColors(True)
+        self.plans_table.verticalHeader().setVisible(False)
         layout.addWidget(self.plans_table)
 
         form_frame = QFrame()
@@ -391,19 +452,21 @@ class AdminDashboard(QMainWindow):
 
         self.inp_plan_level = QSpinBox()
         self.inp_plan_level.setRange(1, 10)
+        self.inp_plan_level.setPrefix("Level: ")
 
         self.combo_plan_course = QComboBox()
         self.load_course_codes_into_combo()
 
         btn_add_plan = QPushButton("Add to Plan")
+        btn_add_plan.setProperty("class", "success-btn")
         btn_add_plan.clicked.connect(self.handle_add_to_plan)
 
         btn_del_plan = QPushButton("Remove Selected")
+        btn_del_plan.setProperty("class", "danger-btn")
         btn_del_plan.clicked.connect(self.handle_delete_from_plan)
 
         ff.addWidget(QLabel("Add Course:"))
         ff.addWidget(self.combo_plan_course)
-        ff.addWidget(QLabel("Level:"))
         ff.addWidget(self.inp_plan_level)
         ff.addWidget(btn_add_plan)
         ff.addStretch()
@@ -458,7 +521,12 @@ class AdminDashboard(QMainWindow):
             con = sqlite3.connect("User.db")
             cur = con.cursor()
 
-            cur.execute("SELECT * FROM courses")
+            # نختار الأعمدة المطلوبة فقط عشان الكود يكون أول عمود
+            cur.execute("""
+                SELECT course_code, course_name, credits, day, start_time, end_time, room, max_capacity
+                FROM courses
+                ORDER BY course_code
+            """)
             rows = cur.fetchall()
             con.close()
 
@@ -470,12 +538,29 @@ class AdminDashboard(QMainWindow):
         except Exception as e:
             print("Course Load Error:", e)
 
+    def refresh_prereq_combo(self):
+        """تحديث قائمة الكورسات المستخدمة لاختيار المتطلبات."""
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute("SELECT course_code FROM courses ORDER BY course_code")
+            courses = cur.fetchall()
+            con.close()
+
+            self.prereq_combo.clear()
+            for c in courses:
+                self.prereq_combo.addItem(c[0])
+
+        except Exception as e:
+            print("Prereq Combo Load Error:", e)
+
     def load_course_codes_into_combo(self):
+        """تستخدم في صفحة الخطط لعرض الكورسات في الكومبوبوكس."""
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
 
-            cur.execute("SELECT course_code FROM courses")
+            cur.execute("SELECT course_code FROM courses ORDER BY course_code")
             courses = cur.fetchall()
 
             self.combo_plan_course.clear()
@@ -496,7 +581,7 @@ class AdminDashboard(QMainWindow):
             cur = con.cursor()
 
             cur.execute(
-                "SELECT program, level, course_code FROM program_plans WHERE program=? ORDER BY level ASC",
+                "SELECT program, level, course_code FROM program_plans WHERE program=? ORDER BY level ASC, course_code",
                 (prog,)
             )
             rows = cur.fetchall()
@@ -511,7 +596,16 @@ class AdminDashboard(QMainWindow):
             print("Plan Load Error:", e)
 
     # =======================================================
-    # HANDLERS
+    # HELPERS (PREREQS)
+    # =======================================================
+    def get_current_prereq_codes(self):
+        codes = []
+        for i in range(self.prereq_list.count()):
+            codes.append(self.prereq_list.item(i).text())
+        return codes
+
+    # =======================================================
+    # HANDLERS - STUDENTS
     # =======================================================
     def handle_add_student(self):
         student_id = self.inp_s_id.text().strip()
@@ -525,27 +619,13 @@ class AdminDashboard(QMainWindow):
             QMessageBox.warning(self, "Error", "Please fill ALL fields including password.")
             return
 
-        try:
-            con = sqlite3.connect("User.db")
-            cur = con.cursor()
+        # --- UPDATED: Use Admin Logic Class (Enforces Encryption) ---
+        success, msg = self.admin_logic.add_student(
+            student_id, name, email, program, level, password
+        )
 
-            # USERS
-            cur.execute("""
-                INSERT INTO users (id, name, email, password, membership) 
-                VALUES (?, ?, ?, ?, ?)
-            """, (student_id, name, email, password, "student"))
-
-            # STUDENTS
-            cur.execute("""
-                INSERT INTO students (id, name, email, program, level) 
-                VALUES (?, ?, ?, ?, ?)
-            """, (student_id, name, email, program, level))
-
-            con.commit()
-            con.close()
-
-            QMessageBox.information(self, "Success", "Student Added Successfully")
-
+        if success:
+            QMessageBox.information(self, "Success", msg)
             self.load_students()
             self.load_dashboard_stats()
 
@@ -554,13 +634,56 @@ class AdminDashboard(QMainWindow):
             self.inp_s_name.clear()
             self.inp_s_email.clear()
             self.inp_s_password.clear()
+        else:
+            QMessageBox.warning(self, "Error", msg)
+
+    def handle_show_password(self):
+        row = self.student_table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Error", "Select a student first.")
+            return
+
+        student_id = self.student_table.item(row, 0).text()
+
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute("SELECT password FROM users WHERE id=?", (student_id,))
+            res = cur.fetchone()
+            con.close()
+
+            if not res:
+                QMessageBox.information(self, "Password", "No user record found in users table.")
+            else:
+                pwd = res[0]
+                QMessageBox.information(self, "Password", f"Password for ID {student_id}:\n{pwd}")
 
         except Exception as e:
-            QMessageBox.warning(self, "Database Error", str(e))
+            QMessageBox.warning(self, "Error", str(e))
+
+    # =======================================================
+    # HANDLERS - COURSES
+    # =======================================================
+    def handle_add_prereq(self):
+        code = self.prereq_combo.currentText().strip()
+        if not code:
+            return
+
+        # ما نكرر الكود في القائمة
+        existing = self.get_current_prereq_codes()
+        if code in existing:
+            return
+
+        self.prereq_list.addItem(code)
+
+    def handle_remove_prereq_item(self, item):
+        row = self.prereq_list.row(item)
+        self.prereq_list.takeItem(row)
 
     def handle_add_course(self):
-        code = self.inp_code.text()
-        name = self.inp_name.text()
+        # إضافة كورس جديد (NOT edit)
+        code = self.inp_code.text().strip()
+        name = self.inp_name.text().strip()
         credits = self.inp_credits.value()
 
         days = [cb.text() for cb in self.day_checkboxes if cb.isChecked()]
@@ -571,26 +694,178 @@ class AdminDashboard(QMainWindow):
 
         start = self.inp_start.value()
         end = self.inp_end.value()
-        room = self.inp_room.text()
+        room = self.inp_room.text().strip()
         cap = self.inp_cap.value()
 
+        prereqs = self.get_current_prereq_codes()
+
         success, msg = self.admin_logic.add_course(
-            code, name, credits, day_str, start, end, room, cap, []
+            code, name, credits, day_str, start, end, room, cap, prereqs
         )
 
         if success:
             QMessageBox.information(self, "Success", "Course Added.")
             self.load_courses()
+            self.refresh_prereq_combo()
             self.load_course_codes_into_combo()
-            
+
+            # Clear form
             self.inp_code.clear()
             self.inp_name.clear()
             self.inp_room.clear()
+            self.inp_credits.setValue(1)
+            self.inp_start.setValue(8)
+            self.inp_end.setValue(9)
+            self.inp_cap.setValue(10)
             for cb in self.day_checkboxes:
                 cb.setChecked(False)
+            self.prereq_list.clear()
 
         else:
             QMessageBox.warning(self, "Error", msg)
+
+    def handle_load_course_for_edit(self):
+        row = self.course_table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Error", "Select a course first.")
+            return
+
+        code = self.course_table.item(row, 0).text()
+        name = self.course_table.item(row, 1).text()
+        credits = self.course_table.item(row, 2).text()
+        days_str = self.course_table.item(row, 3).text()
+        start_str = self.course_table.item(row, 4).text()
+        end_str = self.course_table.item(row, 5).text()
+        room = self.course_table.item(row, 6).text()
+        cap_str = self.course_table.item(row, 7).text()
+
+        # وضع وضعية التعديل
+        self.edit_mode = True
+        self.current_edit_code = code
+        self.btn_update_course.setEnabled(True)
+
+        # الكود مايتغير في التعديل (عشان ما نخرب الجداول الثانية)
+        self.inp_code.setText(code)
+        self.inp_code.setReadOnly(True)
+
+        self.inp_name.setText(name)
+        try:
+            self.inp_credits.setValue(int(credits))
+        except ValueError:
+            self.inp_credits.setValue(1)
+
+        # الأيام
+        days_list = [d.strip() for d in days_str.split(",")] if days_str else []
+        for cb in self.day_checkboxes:
+            cb.setChecked(cb.text() in days_list)
+
+        # الأوقات (نحاول نقرأ أول ساعتين من النص)
+        def parse_hour(s):
+            s = str(s)
+            if ":" in s:
+                try:
+                    return int(s.split(":")[0])
+                except:
+                    return 8
+            try:
+                return int(s)
+            except:
+                return 8
+
+        self.inp_start.setValue(parse_hour(start_str))
+        self.inp_end.setValue(parse_hour(end_str))
+
+        self.inp_room.setText(room)
+        try:
+            self.inp_cap.setValue(int(cap_str))
+        except ValueError:
+            self.inp_cap.setValue(10)
+
+        # تحميل المتطلبات من جدول prerequisites
+        self.prereq_list.clear()
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute("SELECT prereq_code FROM prerequisites WHERE course_code=?", (code,))
+            rows = cur.fetchall()
+            con.close()
+            for r in rows:
+                self.prereq_list.addItem(r[0])
+        except Exception as e:
+            print("Load Prereqs Error:", e)
+
+        QMessageBox.information(self, "Edit Mode", f"Now editing course: {code}")
+
+    def handle_update_course(self):
+        if not self.edit_mode or not self.current_edit_code:
+            QMessageBox.warning(self, "Error", "No course loaded for editing.")
+            return
+
+        code = self.current_edit_code  # ثابت عشان ما نخرب الربط
+        name = self.inp_name.text().strip()
+        credits = self.inp_credits.value()
+
+        days = [cb.text() for cb in self.day_checkboxes if cb.isChecked()]
+        if not days:
+            QMessageBox.warning(self, "Error", "Please select at least one day.")
+            return
+        day_str = ", ".join(days)
+
+        start = self.inp_start.value()
+        end = self.inp_end.value()
+        room = self.inp_room.text().strip()
+        cap = self.inp_cap.value()
+
+        prereqs = self.get_current_prereq_codes()
+
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+
+            # تحديث جدول الكورسات
+            cur.execute("""
+                UPDATE courses
+                SET course_name=?, credits=?, day=?, start_time=?, end_time=?, room=?, max_capacity=?
+                WHERE course_code=?
+            """, (name, credits, day_str, f"{start}:00", f"{end}:00", room, cap, code))
+
+            # حذف المتطلبات القديمة ثم إضافة الجديدة
+            cur.execute("DELETE FROM prerequisites WHERE course_code=?", (code,))
+            for p in prereqs:
+                cur.execute(
+                    "INSERT INTO prerequisites (course_code, prereq_code) VALUES (?, ?)",
+                    (code, p)
+                )
+
+            con.commit()
+            con.close()
+
+            QMessageBox.information(self, "Success", f"Course {code} updated successfully.")
+
+            self.load_courses()
+            self.refresh_prereq_combo()
+            self.load_course_codes_into_combo()
+
+            # الخروج من وضع التعديل
+            self.edit_mode = False
+            self.current_edit_code = None
+            self.btn_update_course.setEnabled(False)
+            self.inp_code.setReadOnly(False)
+
+            # نفرغ النموذج
+            self.inp_code.clear()
+            self.inp_name.clear()
+            self.inp_room.clear()
+            self.inp_credits.setValue(1)
+            self.inp_start.setValue(8)
+            self.inp_end.setValue(9)
+            self.inp_cap.setValue(10)
+            for cb in self.day_checkboxes:
+                cb.setChecked(False)
+            self.prereq_list.clear()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Update failed: {e}")
 
     def handle_delete_course(self):
         row = self.course_table.currentRow()
@@ -601,9 +876,9 @@ class AdminDashboard(QMainWindow):
         code = self.course_table.item(row, 0).text()
 
         confirm = QMessageBox.question(
-            self, 
-            "Confirm", 
-            f"Delete course {code}?", 
+            self,
+            "Confirm",
+            f"Delete course {code}?",
             QMessageBox.Yes | QMessageBox.No
         )
 
@@ -613,34 +888,42 @@ class AdminDashboard(QMainWindow):
             if success:
                 QMessageBox.information(self, "Success", msg)
                 self.load_courses()
+                self.refresh_prereq_combo()
                 self.load_course_codes_into_combo()
             else:
                 QMessageBox.warning(self, "Error", msg)
 
-    # --- NEW: IMPORT HANDLER ---
     def handle_import_csv(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open Course CSV", "", "CSV Files (*.csv);;All Files (*)")
-        
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open Course CSV", "", "CSV Files (*.csv);;All Files (*)"
+        )
+
         if file_path:
-            # Requires Admin.py to have the import_courses_from_csv method
             try:
                 success, summary, error_list = self.admin_logic.import_courses_from_csv(file_path)
-                
+
                 if success:
                     msg = summary
                     if error_list:
                         msg += "\n\nSample Errors:\n" + "\n".join(error_list[:5])
-                    
+
                     QMessageBox.information(self, "Import Result", msg)
-                    self.load_courses()             
-                    self.load_dashboard_stats()     
-                    self.load_course_codes_into_combo() 
+                    self.load_courses()
+                    self.load_dashboard_stats()
+                    self.refresh_prereq_combo()
+                    self.load_course_codes_into_combo()
                 else:
                     QMessageBox.critical(self, "Import Failed", summary)
             except AttributeError:
-                 QMessageBox.critical(self, "Error", "Your Admin.py file is missing the 'import_courses_from_csv' method.\nPlease update Admin.py first.")
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    "Your Admin.py file is missing the 'import_courses_from_csv' method.\nPlease update Admin.py first."
+                )
 
-
+    # =======================================================
+    # HANDLERS - PLANS
+    # =======================================================
     def handle_add_to_plan(self):
         prog = self.filter_program.currentText()
         lvl = self.inp_plan_level.value()
@@ -650,6 +933,15 @@ class AdminDashboard(QMainWindow):
             con = sqlite3.connect("User.db")
             cur = con.cursor()
 
+            # نتجنب التكرار
+            cur.execute("""
+                SELECT 1 FROM program_plans WHERE program=? AND level=? AND course_code=?
+            """, (prog, lvl, code))
+            if cur.fetchone():
+                con.close()
+                QMessageBox.warning(self, "Error", f"{code} already in {prog} Level {lvl}.")
+                return
+
             cur.execute("""
                 INSERT INTO program_plans (program, level, course_code)
                 VALUES (?, ?, ?)
@@ -658,7 +950,7 @@ class AdminDashboard(QMainWindow):
             con.commit()
             con.close()
 
-            QMessageBox.information(self, "Success", f"Added {code} to Level {lvl}")
+            QMessageBox.information(self, "Success", f"Added {code} to {prog} Level {lvl}")
             self.load_plans()
 
         except Exception as e:
@@ -697,5 +989,6 @@ if __name__ == "__main__":
     app.setFont(font)
 
     window = AdminDashboard()
-    window.show()
+    # عشان يفتح مثل صفحة اللوق إن على طول الشاشة
+    window.showMaximized()
     sys.exit(app.exec_())
