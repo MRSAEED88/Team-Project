@@ -1,16 +1,16 @@
 import sys
 import sqlite3
 import bcrypt
-import smtplib  # Required for email
-import random   # Required for generating temp password
-import string   # Required for string characters
+import smtplib
+import random
+import string
 from email.mime.text import MIMEText
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QFrame, QMessageBox, QInputDialog
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QPixmap  # Added QPixmap
 
 # --- IMPORT DASHBOARDS ---
 from student_dashboard import StudentDashboard
@@ -22,18 +22,14 @@ class LoginWindow(QWidget):
         super().__init__()
         self.setWindowTitle("KAU Portal | Secure Login")
 
-        # Make the window start maximized
         self.resize(950, 600)
         self.showMaximized()
-
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        # MAIN LAYOUT (Split Screen)
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
-        # Panels
         self.setup_left_panel()
         self.setup_right_panel()
 
@@ -50,18 +46,32 @@ class LoginWindow(QWidget):
 
         layout = QVBoxLayout(self.left_frame)
         layout.setContentsMargins(40, 0, 40, 0)
-
-        lbl_logo = QLabel("KAU")
-        lbl_logo.setStyleSheet("color: white; font-size: 60px; font-weight: bold;")
-        lbl_logo.setAlignment(Qt.AlignCenter)
-
-        lbl_title = QLabel("Course Registration\nSystem")
-        lbl_title.setStyleSheet("color: #bdc3c7; font-size: 20px;")
-        lbl_title.setAlignment(Qt.AlignCenter)
+        layout.setSpacing(20)
 
         layout.addStretch()
-        layout.addWidget(lbl_logo)
+
+        # --- UPDATED LOGO SECTION ---
+        img_label = QLabel()
+        img_label.setAlignment(Qt.AlignCenter)
+        pixmap = QPixmap("kau_logo.png")
+        
+        if not pixmap.isNull():
+            # Scale slightly larger for the login screen
+            scaled = pixmap.scaled(220, 220, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            img_label.setPixmap(scaled)
+        else:
+            # Fallback Text Logo if image missing
+            img_label.setText("KAU")
+            img_label.setStyleSheet("color: white; font-size: 60px; font-weight: bold;")
+        
+        layout.addWidget(img_label)
+        # ----------------------------
+
+        lbl_title = QLabel("ECE Registration\nSystem")
+        lbl_title.setStyleSheet("color: #bdc3c7; font-size: 24px; font-weight:bold;")
+        lbl_title.setAlignment(Qt.AlignCenter)
         layout.addWidget(lbl_title)
+
         layout.addStretch()
 
         lbl_footer = QLabel("Faculty of Engineering\nFall 2025")
@@ -116,7 +126,6 @@ class LoginWindow(QWidget):
         self.inp_user.setStyleSheet(input_style)
         layout.addWidget(self.inp_user)
 
-        # PASSWORD
         self.inp_pass = QLineEdit()
         self.inp_pass.setPlaceholderText("Password")
         self.inp_pass.setEchoMode(QLineEdit.Password)
@@ -124,7 +133,6 @@ class LoginWindow(QWidget):
         self.inp_pass.returnPressed.connect(self.login_user)
         layout.addWidget(self.inp_pass)
 
-        # --- FORGOT PASSWORD BUTTON (NEW) ---
         self.btn_forgot = QPushButton("Forgot Password?")
         self.btn_forgot.setCursor(Qt.PointingHandCursor)
         self.btn_forgot.setStyleSheet("""
@@ -140,7 +148,6 @@ class LoginWindow(QWidget):
         self.btn_forgot.clicked.connect(self.handle_forgot_password)
         layout.addWidget(self.btn_forgot, alignment=Qt.AlignRight)
 
-        # LOGIN BUTTON
         self.btn_login = QPushButton("Sign In")
         self.btn_login.setCursor(Qt.PointingHandCursor)
         self.btn_login.setStyleSheet("""
@@ -165,13 +172,6 @@ class LoginWindow(QWidget):
     # LOGIC: FORGOT PASSWORD
     # -------------------------------------------------------
     def handle_forgot_password(self):
-        """
-        1. Ask for email.
-        2. Check if exists.
-        3. Generate temp password.
-        4. Update DB.
-        5. Send Email.
-        """
         email, ok = QInputDialog.getText(self, "Password Recovery", "Enter your registered email address:")
         
         if not ok or not email:
@@ -183,7 +183,6 @@ class LoginWindow(QWidget):
             con = sqlite3.connect("User.db")
             cur = con.cursor()
             
-            # Check if email exists
             cur.execute("SELECT id, name FROM users WHERE email=?", (email,))
             user = cur.fetchone()
             
@@ -192,47 +191,33 @@ class LoginWindow(QWidget):
                 QMessageBox.warning(self, "Error", "Email address not found.")
                 return
 
-            user_id, name = user
-            
             # Generate temporary password (8 chars)
             temp_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-            
-            # Hash it for the database
             hashed_pw = bcrypt.hashpw(temp_pass.encode('utf-8'), bcrypt.gensalt())
             
-            # Update Database
             cur.execute("UPDATE users SET password=? WHERE email=?", (hashed_pw, email))
             con.commit()
             con.close()
 
-            # Send Email
             if self.send_recovery_email(email, temp_pass):
-                QMessageBox.information(self, "Success", f"A temporary password has been sent to {email}.\nPlease check your inbox (and spam folder).")
+                QMessageBox.information(self, "Success", f"A temporary password has been sent to {email}.")
             else:
-                # If email fails, show password on screen (ONLY FOR DEMO PURPOSES)
                 QMessageBox.warning(self, "Email Failed", f"Could not send email.\n\nDEMO MODE - Temporary Password: {temp_pass}")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Database Error: {e}")
 
     def send_recovery_email(self, recipient, temp_pass):
-        """
-        Sends the email using smtplib.
-        NOTE: You must fill in YOUR_EMAIL and YOUR_APP_PASSWORD.
-        """
-        # --- CONFIGURATION (FILL THIS IN) ---
-        SENDER_EMAIL = "recoveryee48@gmail.com"  # <--- REPLACE THIS
-        SENDER_PASSWORD = "ioxf bdgy cwjp kkvr"   # <--- REPLACE THIS (Use App Password, not real password)
+        SENDER_EMAIL = "recoveryee48@gmail.com" 
+        SENDER_PASSWORD = "ioxf bdgy cwjp kkvr"   
         SMTP_SERVER = "smtp.gmail.com"
         SMTP_PORT = 587
         
-        # If the user hasn't configured email, fail gracefully so we can show the popup
         if "your_project_email" in SENDER_EMAIL:
-            print("Email not configured in Login_Window.py")
             return False
 
-        msg = MIMEText(f"Hello,\n\nYour password reset request was received.\n\nYour Temporary Password is: {temp_pass}\n\nPlease log in and change your password immediately.\n\nRegards,\nKAU Course Registration System")
-        msg['Subject'] = "Password Recovery - KAU Portal"
+        msg = MIMEText(f"Hello,\n\nYour password reset request was received.\n\nYour Temporary Password is: {temp_pass}\n\nPlease log in and change your password immediately.\n\nRegards,\nECE Registration System")
+        msg['Subject'] = "Password Recovery - ECE Portal"
         msg['From'] = SENDER_EMAIL
         msg['To'] = recipient
 
@@ -273,13 +258,11 @@ class LoginWindow(QWidget):
             if user:
                 user_id, name, db_email, pw_hash, membership = user
 
-                # Convert DB value to bytes
                 if isinstance(pw_hash, str):
                     pw_bytes = pw_hash.encode()
                 else:
                     pw_bytes = pw_hash
 
-                # Password Check
                 valid = False
                 try:
                     valid = bcrypt.checkpw(password.encode(), pw_bytes)
@@ -298,11 +281,7 @@ class LoginWindow(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "System Error", f"Database Error:\n{e}")
 
-    # -------------------------------------------------------
     def open_dashboard(self, user_id, name, email, membership):
-        """
-        Opens the correct dashboard based on membership.
-        """
         if membership.lower() == "admin":
             self.dashboard = AdminDashboard(user_id)
         else:
@@ -311,13 +290,8 @@ class LoginWindow(QWidget):
         self.dashboard.showMaximized() 
         self.close()
 
-
-# -----------------------------------------------------------
-# MAIN APP
-# -----------------------------------------------------------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
     font = QFont("Segoe UI", 10)
     app.setFont(font)
 
