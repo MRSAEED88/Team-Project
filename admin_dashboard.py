@@ -8,12 +8,15 @@ from PyQt5.QtWidgets import (
     QSpinBox, QFormLayout, QCheckBox, QFileDialog, QListWidget
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QPixmap  # Added QPixmap
 
 # --- matplotlib for Reports Tab ---
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-
+try:
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.figure import Figure
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
 
 # --- IMPORT ADMIN LOGIC ---
 from Admin import Admin
@@ -22,10 +25,10 @@ from Admin import Admin
 class AdminDashboard(QMainWindow):
     def __init__(self, user_id=None):
         super().__init__()
-        self.setWindowTitle("KAU Admin Portal | Fall 2025")
+        self.setWindowTitle("ECE Admin Portal | Fall 2025")
         self.resize(1300, 800)
 
-        # حالة تعديل الكورس
+        # Edit Mode State
         self.edit_mode = False
         self.current_edit_code = None
 
@@ -48,21 +51,21 @@ class AdminDashboard(QMainWindow):
         self.content_area = QStackedWidget()
         self.main_layout.addWidget(self.content_area)
 
-        # 5. Create Pages (ترتيب الصفحات مهم لأنه يحدد الـ index)
+        # 5. Create Pages
         self.create_dashboard_page()      # Index 0
         self.create_students_page()       # Index 1
         self.create_courses_page()        # Index 2
         self.create_plans_page()          # Index 3
-        self.create_transcripts_page()    # Index 4 (الترانسكربت)
-        self.create_reports_page()        # Index 5 (Reports & Analytics)
+        self.create_transcripts_page()    # Index 4
+        self.create_reports_page()        # Index 5
 
         # 6. Initial Data Load
         self.load_dashboard_stats()
         self.load_students()
         self.load_courses()
         self.load_plans()
-        self.load_transcript_student_list()  # تحميل الطلاب في قائمة الترانسكربت
-        self.load_reports_data()             # تحميل بيانات التقارير لأول مرة
+        self.load_transcript_student_list()
+        self.load_reports_data()
 
         # Default Page
         self.nav_dashboard.setChecked(True)
@@ -130,11 +133,34 @@ class AdminDashboard(QMainWindow):
 
         layout = QVBoxLayout(self.sidebar)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
+        layout.setSpacing(15) # Increased spacing
 
-        logo = QLabel("Admin Portal")
-        logo.setObjectName("LogoLabel")
-        layout.addWidget(logo)
+        # --- UPDATED LOGO SECTION ---
+        img_label = QLabel()
+        img_label.setAlignment(Qt.AlignCenter)
+        
+        # Load the logo image
+        pixmap = QPixmap("kau_logo.png") 
+        
+        if not pixmap.isNull():
+            # Scale image to fit sidebar
+            scaled = pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            img_label.setPixmap(scaled)
+        else:
+            # Fallback text if image missing
+            img_label.setText("ADMIN")
+            img_label.setStyleSheet("color: #bdc3c7; font-weight: bold; font-size: 20px;")
+            
+        layout.addWidget(img_label)
+
+        # Text Title
+        text_logo = QLabel("ECE Registration\nSystem")
+        text_logo.setObjectName("LogoLabel")
+        text_logo.setAlignment(Qt.AlignCenter)
+        text_logo.setWordWrap(True)
+        text_logo.setStyleSheet("font-size: 18px; font-weight: bold; color: #ecf0f1; padding: 10px;")
+        layout.addWidget(text_logo)
+        # ----------------------------
 
         # Nav Buttons
         self.nav_dashboard = self.create_nav_button("Dashboard Overview")
@@ -142,7 +168,7 @@ class AdminDashboard(QMainWindow):
         self.nav_courses = self.create_nav_button("Manage Courses")
         self.nav_plans = self.create_nav_button("Manage Plans")
         self.nav_transcripts = self.create_nav_button("Student Transcripts")
-        self.nav_reports = self.create_nav_button("Reports & Analytics")  # NEW
+        self.nav_reports = self.create_nav_button("Reports & Analytics") 
 
         layout.addWidget(self.nav_dashboard)
         layout.addWidget(self.nav_students)
@@ -154,7 +180,7 @@ class AdminDashboard(QMainWindow):
         layout.addStretch()
 
         self.btn_logout = self.create_nav_button("Log Out")
-        self.btn_logout.clicked.connect(self.close)
+        self.btn_logout.clicked.connect(self.handle_logout) # Updated connect
         layout.addWidget(self.btn_logout)
 
         self.main_layout.addWidget(self.sidebar)
@@ -175,9 +201,15 @@ class AdminDashboard(QMainWindow):
         return btn
 
     def switch_page(self, index, btn_sender):
-        """تغيير الصفحة المعروضة في الـ QStackedWidget"""
         self.content_area.setCurrentIndex(index)
         btn_sender.setChecked(True)
+
+    def handle_logout(self):
+        """Returns to the Login Window."""
+        from Login_Window import LoginWindow
+        self.login_window = LoginWindow()
+        self.login_window.showMaximized()
+        self.close()
 
     # =======================================================
     # PAGE 1: OVERVIEW
@@ -254,12 +286,10 @@ class AdminDashboard(QMainWindow):
         self.student_table.verticalHeader().setVisible(False)
         layout.addWidget(self.student_table)
 
-        # دبل كلك على الطالب يفتح صفحة الترانسكربت مباشرة لهذا الطالب
         self.student_table.itemDoubleClicked.connect(
             self.open_transcript_from_students_page
         )
 
-        # Action Bar (Show Password)
         action_layout = QHBoxLayout()
         action_layout.addStretch()
 
@@ -270,7 +300,6 @@ class AdminDashboard(QMainWindow):
 
         layout.addLayout(action_layout)
 
-        # Add Student Form
         form_frame = QFrame()
         form_frame.setProperty("class", "card")
         form_layout = QFormLayout(form_frame)
@@ -325,7 +354,6 @@ class AdminDashboard(QMainWindow):
         title.setProperty("class", "page-title")
         layout.addWidget(title)
 
-        # TABLE
         self.course_table = QTableWidget()
         self.course_table.setColumnCount(8)
         self.course_table.setHorizontalHeaderLabels(
@@ -337,7 +365,6 @@ class AdminDashboard(QMainWindow):
         self.course_table.verticalHeader().setVisible(False)
         layout.addWidget(self.course_table)
 
-        # ACTION BAR (IMPORT / LOAD / DELETE)
         action_layout = QHBoxLayout()
 
         self.btn_import = QPushButton("Import CSV")
@@ -359,7 +386,6 @@ class AdminDashboard(QMainWindow):
 
         layout.addLayout(action_layout)
 
-        # ADD / EDIT COURSE FORM
         form_frame = QFrame()
         form_frame.setProperty("class", "card")
         f = QVBoxLayout(form_frame)
@@ -370,7 +396,6 @@ class AdminDashboard(QMainWindow):
 
         grid = QHBoxLayout()
 
-        # Column 1: Details
         col1 = QVBoxLayout()
         col1.addWidget(QLabel("Details"))
         self.inp_code = QLineEdit()
@@ -385,7 +410,6 @@ class AdminDashboard(QMainWindow):
         col1.addWidget(self.inp_name)
         col1.addWidget(self.inp_credits)
 
-        # Column 2: Schedule (Hours + Minutes)
         col2 = QVBoxLayout()
         col2.addWidget(QLabel("Schedule (Select Days)"))
         days_layout = QHBoxLayout()
@@ -397,7 +421,6 @@ class AdminDashboard(QMainWindow):
             days_layout.addWidget(cb)
         col2.addLayout(days_layout)
 
-        # ساعت البداية
         time_row_start = QHBoxLayout()
         self.inp_start_hour = QSpinBox()
         self.inp_start_hour.setRange(8, 20)
@@ -408,7 +431,6 @@ class AdminDashboard(QMainWindow):
         time_row_start.addWidget(self.inp_start_min)
         col2.addLayout(time_row_start)
 
-        # ساعة النهاية
         time_row_end = QHBoxLayout()
         self.inp_end_hour = QSpinBox()
         self.inp_end_hour.setRange(9, 21)
@@ -419,7 +441,6 @@ class AdminDashboard(QMainWindow):
         time_row_end.addWidget(self.inp_end_min)
         col2.addLayout(time_row_end)
 
-        # Column 3: Location + Prereqs + Buttons
         col3 = QVBoxLayout()
         col3.addWidget(QLabel("Location"))
         self.inp_room = QLineEdit()
@@ -431,7 +452,6 @@ class AdminDashboard(QMainWindow):
         col3.addWidget(self.inp_room)
         col3.addWidget(self.inp_cap)
 
-        # Prerequisites UI
         col3.addWidget(QLabel("Prerequisites"))
         self.prereq_combo = QComboBox()
         self.refresh_prereq_combo()
@@ -447,7 +467,6 @@ class AdminDashboard(QMainWindow):
         self.prereq_list.itemDoubleClicked.connect(self.handle_remove_prereq_item)
         col3.addWidget(self.prereq_list)
 
-        # Buttons
         self.btn_add_course = QPushButton("Add New Course")
         self.btn_add_course.setProperty("class", "success-btn")
         self.btn_add_course.clicked.connect(self.handle_add_course)
@@ -536,12 +555,6 @@ class AdminDashboard(QMainWindow):
     # PAGE 5: STUDENT TRANSCRIPTS
     # =======================================================
     def create_transcripts_page(self):
-        """
-        صفحة الترانسكربت:
-        - اختيار طالب
-        - عرض المواد والدرجات من جدول transcripts + المواد المسجّلة من registration
-        - تعديل الدرجات مباشرة من الجدول
-        """
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(30, 30, 30, 30)
@@ -550,7 +563,6 @@ class AdminDashboard(QMainWindow):
         title.setProperty("class", "page-title")
         layout.addWidget(title)
 
-        # شريط علوي لاختيار الطالب
         top_frame = QFrame()
         top_frame.setProperty("class", "card")
         top_layout = QHBoxLayout(top_frame)
@@ -574,7 +586,6 @@ class AdminDashboard(QMainWindow):
 
         layout.addWidget(top_frame)
 
-        # جدول الترانسكربت
         self.transcript_table = QTableWidget()
         self.transcript_table.setColumnCount(4)
         self.transcript_table.setHorizontalHeaderLabels(
@@ -586,7 +597,6 @@ class AdminDashboard(QMainWindow):
         self.transcript_table.verticalHeader().setVisible(False)
         layout.addWidget(self.transcript_table)
 
-        # ملخص + زر حفظ الدرجات
         summary_layout = QHBoxLayout()
         self.lbl_transcript_summary = QLabel("No student selected.")
         summary_layout.addWidget(self.lbl_transcript_summary)
@@ -602,14 +612,9 @@ class AdminDashboard(QMainWindow):
         self.content_area.addWidget(page)
 
     # =======================================================
-    # PAGE 6: REPORTS & ANALYTICS (NEW)
+    # PAGE 6: REPORTS & ANALYTICS
     # =======================================================
     def create_reports_page(self):
-        """
-        تقارير و تحليلات:
-        - جدول بسيط يوضح: Course Code, Capacity, Enrolled, Remaining
-        - رسم بياني Bar Chart لعدد المسجلين في كل كورس
-        """
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(30, 30, 30, 30)
@@ -618,7 +623,6 @@ class AdminDashboard(QMainWindow):
         title.setProperty("class", "page-title")
         layout.addWidget(title)
 
-        # شريط علوي فيه زر Refresh
         top_frame = QFrame()
         top_frame.setProperty("class", "card")
         top_layout = QHBoxLayout(top_frame)
@@ -635,7 +639,6 @@ class AdminDashboard(QMainWindow):
 
         layout.addWidget(top_frame)
 
-        # جدول ملخص الكورسات
         self.reports_table = QTableWidget()
         self.reports_table.setColumnCount(4)
         self.reports_table.setHorizontalHeaderLabels(
@@ -647,16 +650,18 @@ class AdminDashboard(QMainWindow):
         self.reports_table.verticalHeader().setVisible(False)
         layout.addWidget(self.reports_table)
 
-        # رسم بياني باستخدام matplotlib
-        chart_frame = QFrame()
-        chart_frame.setProperty("class", "card")
-        chart_layout = QVBoxLayout(chart_frame)
+        if MATPLOTLIB_AVAILABLE:
+            chart_frame = QFrame()
+            chart_frame.setProperty("class", "card")
+            chart_layout = QVBoxLayout(chart_frame)
 
-        self.figure = Figure(figsize=(6, 4))
-        self.canvas = FigureCanvas(self.figure)
-        chart_layout.addWidget(self.canvas)
+            self.figure = Figure(figsize=(6, 4))
+            self.canvas = FigureCanvas(self.figure)
+            chart_layout.addWidget(self.canvas)
 
-        layout.addWidget(chart_frame)
+            layout.addWidget(chart_frame)
+        else:
+            layout.addWidget(QLabel("Matplotlib not installed. Please run: pip install matplotlib"))
 
         self.content_area.addWidget(page)
 
@@ -724,7 +729,6 @@ class AdminDashboard(QMainWindow):
             print("Course Load Error:", e)
 
     def refresh_prereq_combo(self):
-        """تحديث قائمة الكورسات المستخدمة لاختيار المتطلبات."""
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
@@ -740,7 +744,6 @@ class AdminDashboard(QMainWindow):
             print("Prereq Combo Load Error:", e)
 
     def load_course_codes_into_combo(self):
-        """تستخدم في صفحة الخطط لعرض الكورسات في الكومبوبوكس."""
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
@@ -781,13 +784,7 @@ class AdminDashboard(QMainWindow):
         except Exception as e:
             print("Plan Load Error:", e)
 
-    # ---------- Transcript: تحميل الطلاب في الكومبوبوكس ----------
     def load_transcript_student_list(self):
-        """
-        تعبئة ComboBox في صفحة الترانسكربت بقائمة الطلاب:
-        الشكل في الواجهة: "2241234 - Ahmed Ali"
-        الـ data: رقم الطالب (id) فقط.
-        """
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
@@ -803,13 +800,7 @@ class AdminDashboard(QMainWindow):
         except Exception as e:
             print("Transcript Student List Error:", e)
 
-    # ---------- Reports: Load Data & Draw Chart ----------
     def load_reports_data(self):
-        """
-        - يجلب الكورسات من courses
-        - يحسب عدد المسجلين من جدول registration
-        - يعرضها في جدول + يرسم Bar Chart
-        """
         self.reports_table.setRowCount(0)
         course_codes = []
         enrolled_counts = []
@@ -819,7 +810,6 @@ class AdminDashboard(QMainWindow):
             con = sqlite3.connect("User.db")
             cur = con.cursor()
 
-            # نجيب كل الكورسات مع السعة
             cur.execute("""
                 SELECT course_code, max_capacity
                 FROM courses
@@ -827,24 +817,20 @@ class AdminDashboard(QMainWindow):
             """)
             courses = cur.fetchall()
 
-            # لكل كورس نحسب عدد المسجلين من جدول registration
             for idx, (code, cap) in enumerate(courses):
                 cur.execute(
                     "SELECT COUNT(*) FROM registration WHERE course_code = ?",
                     (code,)
                 )
                 enrolled = cur.fetchone()[0]
-
                 remaining = max(cap - enrolled, 0)
 
-                # إضافة للجدول
                 self.reports_table.insertRow(idx)
                 self.reports_table.setItem(idx, 0, QTableWidgetItem(str(code)))
                 self.reports_table.setItem(idx, 1, QTableWidgetItem(str(cap)))
                 self.reports_table.setItem(idx, 2, QTableWidgetItem(str(enrolled)))
                 self.reports_table.setItem(idx, 3, QTableWidgetItem(str(remaining)))
 
-                # لتحضير الرسم
                 course_codes.append(code)
                 enrolled_counts.append(enrolled)
                 capacities.append(cap)
@@ -855,28 +841,20 @@ class AdminDashboard(QMainWindow):
             QMessageBox.warning(self, "Error", f"Failed to load reports: {e}")
             return
 
-        # تحديث الشرح العلوي
         total_courses = len(course_codes)
         self.lbl_reports_info.setText(
             f"Total Courses: {total_courses} | Chart based on enrollment count per course."
         )
 
-        # رسم الـ Bar Chart
-        self.draw_enrollment_chart(course_codes, enrolled_counts, capacities)
+        if MATPLOTLIB_AVAILABLE:
+            self.draw_enrollment_chart(course_codes, enrolled_counts, capacities)
 
     def draw_enrollment_chart(self, course_codes, enrolled_counts, capacities):
-        """
-        يرسم Bar Chart باستخدام matplotlib:
-        - X: course_codes
-        - Y: enrolled_counts
-        ويظلل الكورسات الممتلئة بلون مختلف (بس هنا نستخدم نفس اللون حسب سياسة التعليمات)
-        """
         self.figure.clear()
         ax = self.figure.add_subplot(111)
 
-        # رسم الأعمدة
         x_positions = range(len(course_codes))
-        ax.bar(x_positions, enrolled_counts)
+        ax.bar(x_positions, enrolled_counts, color="#3498db")
 
         ax.set_xticks(x_positions)
         ax.set_xticklabels(course_codes, rotation=45, ha='right')
@@ -888,7 +866,7 @@ class AdminDashboard(QMainWindow):
         self.canvas.draw()
 
     # =======================================================
-    # HELPERS (PREREQS + TIME)
+    # HELPERS
     # =======================================================
     def get_current_prereq_codes(self):
         codes = []
@@ -897,20 +875,13 @@ class AdminDashboard(QMainWindow):
         return codes
 
     def parse_time_str(self, s):
-        """
-        يحول نص الوقت مثل '08:30' أو '8' إلى (ساعة, دقيقة)
-        لو في مشكلة يرجع (8, 0) افتراضيًا.
-        """
         try:
             s = str(s).strip()
             if ":" in s:
                 parts = s.split(":")
-                hour = int(parts[0])
-                minute = int(parts[1])
-                return hour, minute
+                return int(parts[0]), int(parts[1])
             else:
-                hour = int(s)
-                return hour, 0
+                return int(s), 0
         except Exception:
             return 8, 0
 
@@ -929,7 +900,6 @@ class AdminDashboard(QMainWindow):
             QMessageBox.warning(self, "Error", "Please fill ALL fields including password.")
             return
 
-        # --- Use Admin Logic Class ---
         success, msg = self.admin_logic.add_student(
             student_id, name, email, program, level, password
         )
@@ -938,9 +908,7 @@ class AdminDashboard(QMainWindow):
             QMessageBox.information(self, "Success", msg)
             self.load_students()
             self.load_dashboard_stats()
-            self.load_transcript_student_list()  # تحديث قائمة الطلاب في الترانسكربت
-
-            # Clear inputs
+            self.load_transcript_student_list()
             self.inp_s_id.clear()
             self.inp_s_name.clear()
             self.inp_s_email.clear()
@@ -967,35 +935,20 @@ class AdminDashboard(QMainWindow):
                 QMessageBox.information(self, "Password", "No user record found in users table.")
             else:
                 pwd = res[0]
-                QMessageBox.information(
-                    self, "Password",
-                    f"Password for ID {student_id}:\n{pwd}"
-                )
+                QMessageBox.information(self, "Password", f"Password for ID {student_id}:\n{pwd}")
 
         except Exception as e:
             QMessageBox.warning(self, "Error", str(e))
 
-    # -------- دبل كلك على الطالب → فتح صفحة الترانسكربت له ----------
     def open_transcript_from_students_page(self, item):
-        """
-        عند الضغط دبل كلك على أي خلية في صف الطالب:
-        - نجيب ID الطالب
-        - نحول مباشرة لصفحة الترانسكربت
-        - نحمّل سجله الأكاديمي
-        """
         row = item.row()
         sid_item = self.student_table.item(row, 0)
         if not sid_item:
             return
-
         student_id = sid_item.text().strip()
-
-        # نحدد الطالب في الكومبو بوكس إن وُجد
         idx = self.transcript_student_combo.findData(student_id)
         if idx != -1:
             self.transcript_student_combo.setCurrentIndex(idx)
-
-        # نفتح صفحة الترانسكربت ونحمّلها
         self.switch_page(4, self.nav_transcripts)
         self.load_transcript_for_student(student_id)
 
@@ -1004,41 +957,26 @@ class AdminDashboard(QMainWindow):
     # =======================================================
     def handle_add_prereq(self):
         code = self.prereq_combo.currentText().strip()
-        if not code:
-            return
-
-        existing = self.get_current_prereq_codes()
-        if code in existing:
-            return
-
+        if not code: return
+        if code in self.get_current_prereq_codes(): return
         self.prereq_list.addItem(code)
 
     def handle_remove_prereq_item(self, item):
-        row = self.prereq_list.row(item)
-        self.prereq_list.takeItem(row)
+        self.prereq_list.takeItem(self.prereq_list.row(item))
 
     def handle_add_course(self):
         code = self.inp_code.text().strip()
         name = self.inp_name.text().strip()
         credits = self.inp_credits.value()
-
         days = [cb.text() for cb in self.day_checkboxes if cb.isChecked()]
         if not days:
             QMessageBox.warning(self, "Error", "Please select at least one day.")
             return
         day_str = ", ".join(days)
-
-        start_hour = self.inp_start_hour.value()
-        start_min = self.inp_start_min.currentText()
-        end_hour = self.inp_end_hour.value()
-        end_min = self.inp_end_min.currentText()
-
-        start_time = f"{start_hour:02d}:{start_min}"
-        end_time = f"{end_hour:02d}:{end_min}"
-
+        start_time = f"{self.inp_start_hour.value():02d}:{self.inp_start_min.currentText()}"
+        end_time = f"{self.inp_end_hour.value():02d}:{self.inp_end_min.currentText()}"
         room = self.inp_room.text().strip()
         cap = self.inp_cap.value()
-
         prereqs = self.get_current_prereq_codes()
 
         success, msg = self.admin_logic.add_course(
@@ -1050,21 +988,12 @@ class AdminDashboard(QMainWindow):
             self.load_courses()
             self.refresh_prereq_combo()
             self.load_course_codes_into_combo()
-            self.load_reports_data()  # تحديث التقارير بعد إضافة كورس
-
+            self.load_reports_data()
             self.inp_code.clear()
             self.inp_name.clear()
             self.inp_room.clear()
             self.inp_credits.setValue(1)
-            self.inp_start_hour.setValue(8)
-            self.inp_start_min.setCurrentIndex(0)
-            self.inp_end_hour.setValue(9)
-            self.inp_end_min.setCurrentIndex(0)
-            self.inp_cap.setValue(10)
-            for cb in self.day_checkboxes:
-                cb.setChecked(False)
             self.prereq_list.clear()
-
         else:
             QMessageBox.warning(self, "Error", msg)
 
@@ -1089,397 +1018,172 @@ class AdminDashboard(QMainWindow):
 
         self.inp_code.setText(code)
         self.inp_code.setReadOnly(True)
-
         self.inp_name.setText(name)
-        try:
-            self.inp_credits.setValue(int(credits))
-        except ValueError:
-            self.inp_credits.setValue(1)
+        try: self.inp_credits.setValue(int(credits))
+        except: self.inp_credits.setValue(1)
 
         days_list = [d.strip() for d in days_str.split(",")] if days_str else []
-        for cb in self.day_checkboxes:
-            cb.setChecked(cb.text() in days_list)
+        for cb in self.day_checkboxes: cb.setChecked(cb.text() in days_list)
 
-        start_h, start_m = self.parse_time_str(start_str)
-        end_h, end_m = self.parse_time_str(end_str)
-
-        self.inp_start_hour.setValue(start_h)
-        self.inp_end_hour.setValue(end_h)
-
-        start_m_str = f"{start_m:02d}"
-        end_m_str = f"{end_m:02d}"
-
-        idx_start_min = self.inp_start_min.findText(start_m_str)
-        if idx_start_min == -1:
-            idx_start_min = 0
-        self.inp_start_min.setCurrentIndex(idx_start_min)
-
-        idx_end_min = self.inp_end_min.findText(end_m_str)
-        if idx_end_min == -1:
-            idx_end_min = 0
-        self.inp_end_min.setCurrentIndex(idx_end_min)
-
+        sh, sm = self.parse_time_str(start_str)
+        eh, em = self.parse_time_str(end_str)
+        self.inp_start_hour.setValue(sh)
+        self.inp_end_hour.setValue(eh)
+        
         self.inp_room.setText(room)
-        try:
-            self.inp_cap.setValue(int(cap_str))
-        except ValueError:
-            self.inp_cap.setValue(10)
+        try: self.inp_cap.setValue(int(cap_str))
+        except: self.inp_cap.setValue(10)
 
         self.prereq_list.clear()
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
             cur.execute("SELECT prereq_code FROM prerequisites WHERE course_code=?", (code,))
-            rows = cur.fetchall()
+            for r in cur.fetchall(): self.prereq_list.addItem(r[0])
             con.close()
-            for r in rows:
-                self.prereq_list.addItem(r[0])
-        except Exception as e:
-            print("Load Prereqs Error:", e)
-
+        except: pass
         QMessageBox.information(self, "Edit Mode", f"Now editing course: {code}")
 
     def handle_update_course(self):
-        if not self.edit_mode or not self.current_edit_code:
-            QMessageBox.warning(self, "Error", "No course loaded for editing.")
-            return
-
+        if not self.edit_mode: return
         code = self.current_edit_code
         name = self.inp_name.text().strip()
         credits = self.inp_credits.value()
-
         days = [cb.text() for cb in self.day_checkboxes if cb.isChecked()]
-        if not days:
-            QMessageBox.warning(self, "Error", "Please select at least one day.")
-            return
+        if not days: return QMessageBox.warning(self, "Error", "Select day")
         day_str = ", ".join(days)
-
-        start_hour = self.inp_start_hour.value()
-        start_min = self.inp_start_min.currentText()
-        end_hour = self.inp_end_hour.value()
-        end_min = self.inp_end_min.currentText()
-
-        start_time = f"{start_hour:02d}:{start_min}"
-        end_time = f"{end_hour:02d}:{end_min}"
-
+        start_time = f"{self.inp_start_hour.value():02d}:{self.inp_start_min.currentText()}"
+        end_time = f"{self.inp_end_hour.value():02d}:{self.inp_end_min.currentText()}"
         room = self.inp_room.text().strip()
         cap = self.inp_cap.value()
-
         prereqs = self.get_current_prereq_codes()
 
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
-
             cur.execute("""
                 UPDATE courses
                 SET course_name=?, credits=?, day=?, start_time=?, end_time=?, room=?, max_capacity=?
                 WHERE course_code=?
             """, (name, credits, day_str, start_time, end_time, room, cap, code))
-
+            
             cur.execute("DELETE FROM prerequisites WHERE course_code=?", (code,))
             for p in prereqs:
-                cur.execute(
-                    "INSERT INTO prerequisites (course_code, prereq_code) VALUES (?, ?)",
-                    (code, p)
-                )
-
+                cur.execute("INSERT INTO prerequisites (course_code, prereq_code) VALUES (?, ?)", (code, p))
+            
             con.commit()
             con.close()
-
-            QMessageBox.information(self, "Success", f"Course {code} updated successfully.")
-
+            QMessageBox.information(self, "Success", "Course updated.")
             self.load_courses()
-            self.refresh_prereq_combo()
-            self.load_course_codes_into_combo()
-            self.load_reports_data()  # تحديث التقارير بعد التعديل
-
             self.edit_mode = False
-            self.current_edit_code = None
             self.btn_update_course.setEnabled(False)
             self.inp_code.setReadOnly(False)
-
             self.inp_code.clear()
             self.inp_name.clear()
-            self.inp_room.clear()
-            self.inp_credits.setValue(1)
-            self.inp_start_hour.setValue(8)
-            self.inp_start_min.setCurrentIndex(0)
-            self.inp_end_hour.setValue(9)
-            self.inp_end_min.setCurrentIndex(0)
-            self.inp_cap.setValue(10)
-            for cb in self.day_checkboxes:
-                cb.setChecked(False)
-            self.prereq_list.clear()
-
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Update failed: {e}")
+        except Exception as e: QMessageBox.warning(self, "Error", str(e))
 
     def handle_delete_course(self):
         row = self.course_table.currentRow()
-        if row < 0:
-            QMessageBox.warning(self, "Error", "Select a course first.")
-            return
-
+        if row < 0: return
         code = self.course_table.item(row, 0).text()
-
-        confirm = QMessageBox.question(
-            self,
-            "Confirm",
-            f"Delete course {code}?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
-        if confirm == QMessageBox.Yes:
+        if QMessageBox.question(self, "Confirm", f"Delete {code}?", QMessageBox.Yes|QMessageBox.No) == QMessageBox.Yes:
             success, msg = self.admin_logic.delete_course(code)
-
             if success:
                 QMessageBox.information(self, "Success", msg)
                 self.load_courses()
                 self.refresh_prereq_combo()
                 self.load_course_codes_into_combo()
-                self.load_reports_data()  # تحديث التقارير بعد الحذف
-            else:
-                QMessageBox.warning(self, "Error", msg)
+                self.load_reports_data()
 
     def handle_import_csv(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Open Course CSV", "", "CSV Files (*.csv);;All Files (*)"
-        )
-
-        if file_path:
-            try:
-                success, summary, error_list = self.admin_logic.import_courses_from_csv(file_path)
-
-                if success:
-                    msg = summary
-                    if error_list:
-                        msg += "\n\nSample Errors:\n" + "\n".join(error_list[:5])
-
-                    QMessageBox.information(self, "Import Result", msg)
-                    self.load_courses()
-                    self.load_dashboard_stats()
-                    self.refresh_prereq_combo()
-                    self.load_course_codes_into_combo()
-                    self.load_reports_data()  # تحديث التقارير بعد الاستيراد
-                else:
-                    QMessageBox.critical(self, "Import Failed", summary)
-            except AttributeError:
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    "Your Admin.py file is missing the 'import_courses_from_csv' method.\n"
-                    "Please update Admin.py first."
-                )
+        fp, _ = QFileDialog.getOpenFileName(self, "CSV", "", "CSV (*.csv)")
+        if fp:
+            s, sum_txt, errs = self.admin_logic.import_courses_from_csv(fp)
+            msg = sum_txt + ("\nErrors:\n"+"\n".join(errs[:5]) if errs else "")
+            QMessageBox.information(self,"Result",msg)
+            self.load_courses(); self.load_reports_data()
 
     # =======================================================
     # HANDLERS - PLANS
     # =======================================================
     def handle_add_to_plan(self):
-        prog = self.filter_program.currentText()
-        lvl = self.inp_plan_level.value()
-        code = self.combo_plan_course.currentText()
-
+        p = self.filter_program.currentText(); l = self.inp_plan_level.value(); c = self.combo_plan_course.currentText()
         try:
             con = sqlite3.connect("User.db")
-            cur = con.cursor()
-
-            cur.execute("""
-                SELECT 1 FROM program_plans WHERE program=? AND level=? AND course_code=?
-            """, (prog, lvl, code))
-            if cur.fetchone():
-                con.close()
-                QMessageBox.warning(self, "Error", f"{code} already in {prog} Level {lvl}.")
-                return
-
-            cur.execute("""
-                INSERT INTO program_plans (program, level, course_code)
-                VALUES (?, ?, ?)
-            """, (prog, lvl, code))
-
-            con.commit()
-            con.close()
-
-            QMessageBox.information(self, "Success", f"Added {code} to {prog} Level {lvl}")
+            if con.execute("SELECT 1 FROM program_plans WHERE program=? AND level=? AND course_code=?",(p,l,c)).fetchone():
+                return QMessageBox.warning(self,"Error","Already exists in plan")
+            con.execute("INSERT INTO program_plans VALUES (?,?,?)",(p,l,c)); con.commit(); con.close()
             self.load_plans()
-
-        except Exception as e:
-            QMessageBox.warning(self, "Error", str(e))
+        except Exception as e: QMessageBox.warning(self,"Error",str(e))
 
     def handle_delete_from_plan(self):
-        row = self.plans_table.currentRow()
-        if row < 0:
-            QMessageBox.warning(self, "Error", "Select a row.")
-            return
-
-        prog = self.plans_table.item(row, 0).text()
-        lvl = self.plans_table.item(row, 1).text()
-        code = self.plans_table.item(row, 2).text()
-
+        r = self.plans_table.currentRow()
+        if r < 0: return
+        p = self.plans_table.item(r,0).text(); l = self.plans_table.item(r,1).text(); c = self.plans_table.item(r,2).text()
         try:
-            con = sqlite3.connect("User.db")
-            cur = con.cursor()
-
-            cur.execute("""
-                DELETE FROM program_plans WHERE program=? AND level=? AND course_code=?
-            """, (prog, lvl, code))
-
-            con.commit()
-            con.close()
-
+            con=sqlite3.connect("User.db"); con.execute("DELETE FROM program_plans WHERE program=? AND level=? AND course_code=?",(p,l,c)); con.commit(); con.close()
             self.load_plans()
-
-        except Exception as e:
-            QMessageBox.warning(self, "Error", str(e))
+        except: pass
 
     # =======================================================
-    # HANDLERS - TRANSCRIPTS (LOAD + SAVE GRADES)
+    # HANDLERS - TRANSCRIPTS
     # =======================================================
     def handle_load_transcript_clicked(self):
         idx = self.transcript_student_combo.currentIndex()
-        if idx < 0:
-            QMessageBox.warning(self, "Error", "No student selected.")
-            return
+        if idx<0: return QMessageBox.warning(self,"Error","No student selected")
+        sid = self.transcript_student_combo.currentData()
+        self.load_transcript_for_student(sid)
 
-        student_id = self.transcript_student_combo.currentData()
-        if not student_id:
-            QMessageBox.warning(self, "Error", "Invalid student selection.")
-            return
-
-        self.load_transcript_for_student(student_id)
-
-    def load_transcript_for_student(self, student_id):
-        """
-        تحميل الترانسكربت:
-        - يعرض كل المواد المسجّلة من registration
-        - لو فيه Grade في transcripts لنفس المادة تنعرض
-        - يدعم مواد لها Grade فقط بدون تسجيل
-        """
+    def load_transcript_for_student(self, sid):
         self.transcript_table.setRowCount(0)
-
         try:
             con = sqlite3.connect("User.db")
-            cur = con.cursor()
-
-            cur.execute("SELECT name FROM students WHERE id=?", (student_id,))
-            row_name = cur.fetchone()
-            student_name = row_name[0] if row_name else "Unknown"
-
-            cur.execute("""
+            nm = con.execute("SELECT name FROM students WHERE id=?",(sid,)).fetchone()
+            nm = nm[0] if nm else "Unknown"
+            
+            rows = con.execute("""
                 SELECT course_code, course_name, credits, grade FROM (
-                    SELECT r.course_code AS course_code,
-                           COALESCE(c.course_name, '') AS course_name,
-                           COALESCE(c.credits, 0) AS credits,
-                           t.grade AS grade
-                    FROM registration r
-                    LEFT JOIN courses c ON r.course_code = c.course_code
-                    LEFT JOIN transcripts t
-                           ON t.student_id = r.student_id AND t.course_code = r.course_code
-                    WHERE r.student_id = ?
-
+                    SELECT r.course_code, c.course_name, c.credits, t.grade 
+                    FROM registration r 
+                    LEFT JOIN courses c ON r.course_code=c.course_code 
+                    LEFT JOIN transcripts t ON t.student_id=r.student_id AND t.course_code=r.course_code
+                    WHERE r.student_id=?
                     UNION
-
-                    SELECT t.course_code AS course_code,
-                           COALESCE(c.course_name, '') AS course_name,
-                           COALESCE(c.credits, 0) AS credits,
-                           t.grade AS grade
-                    FROM transcripts t
-                    LEFT JOIN courses c ON t.course_code = c.course_code
-                    WHERE t.student_id = ?
-                      AND t.course_code NOT IN (
-                          SELECT course_code FROM registration WHERE student_id = ?
-                      )
-                )
-                ORDER BY course_code
-            """, (student_id, student_id, student_id))
-            rows = cur.fetchall()
+                    SELECT t.course_code, c.course_name, c.credits, t.grade 
+                    FROM transcripts t 
+                    LEFT JOIN courses c ON t.course_code=c.course_code
+                    WHERE t.student_id=? AND t.course_code NOT IN (SELECT course_code FROM registration WHERE student_id=?)
+                ) ORDER BY course_code
+            """, (sid, sid, sid)).fetchall()
             con.close()
 
-            for row_idx, row_data in enumerate(rows):
-                self.transcript_table.insertRow(row_idx)
-                for col_idx, data in enumerate(row_data):
-                    if data is None:
-                        data = ""
-                    item = QTableWidgetItem(str(data))
-
-                    if col_idx in (0, 1, 2):
-                        item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
-                    else:
-                        item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
-
-                    self.transcript_table.setItem(row_idx, col_idx, item)
-
-            count_courses = len(rows)
-            self.lbl_transcript_summary.setText(
-                f"Transcript for Student ID {student_id} - {student_name} | "
-                f"Total Courses: {count_courses}"
-            )
-
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to load transcript: {e}")
+            for r, rd in enumerate(rows):
+                self.transcript_table.insertRow(r)
+                for c, d in enumerate(rd):
+                    it = QTableWidgetItem(str(d) if d else "")
+                    if c in (0,1,2): it.setFlags(Qt.ItemIsSelectable|Qt.ItemIsEnabled)
+                    self.transcript_table.setItem(r, c, it)
+            self.lbl_transcript_summary.setText(f"Transcript for {sid} - {nm}")
+        except Exception as e: QMessageBox.warning(self,"Error",str(e))
 
     def handle_save_grades(self):
         idx = self.transcript_student_combo.currentIndex()
-        if idx < 0:
-            QMessageBox.warning(self, "Error", "No student selected.")
-            return
-
-        student_id = self.transcript_student_combo.currentData()
-        if not student_id:
-            QMessageBox.warning(self, "Error", "Invalid student selection.")
-            return
-
-        row_count = self.transcript_table.rowCount()
+        if idx<0: return
+        sid = self.transcript_student_combo.currentData()
         try:
             con = sqlite3.connect("User.db")
-            cur = con.cursor()
-
-            for row in range(row_count):
-                code_item = self.transcript_table.item(row, 0)
-                grade_item = self.transcript_table.item(row, 3)
-
-                if not code_item:
-                    continue
-
-                course_code = code_item.text().strip()
-                if not course_code:
-                    continue
-
-                grade = grade_item.text().strip() if grade_item else ""
-
-                if grade == "":
-                    cur.execute(
-                        "DELETE FROM transcripts WHERE student_id=? AND course_code=?",
-                        (student_id, course_code)
-                    )
+            for r in range(self.transcript_table.rowCount()):
+                cc = self.transcript_table.item(r,0).text()
+                gr = self.transcript_table.item(r,3).text().strip()
+                if not gr: con.execute("DELETE FROM transcripts WHERE student_id=? AND course_code=?",(sid,cc))
                 else:
-                    cur.execute(
-                        "SELECT 1 FROM transcripts WHERE student_id=? AND course_code=?",
-                        (student_id, course_code)
-                    )
-                    exists = cur.fetchone()
-
-                    if exists:
-                        cur.execute(
-                            "UPDATE transcripts SET grade=? "
-                            "WHERE student_id=? AND course_code=?",
-                            (grade, student_id, course_code)
-                        )
-                    else:
-                        cur.execute(
-                            "INSERT INTO transcripts (student_id, course_code, grade) "
-                            "VALUES (?, ?, ?)",
-                            (student_id, course_code, grade)
-                        )
-
-            con.commit()
-            con.close()
-
-            QMessageBox.information(self, "Success", "Grades saved successfully.")
-            self.load_transcript_for_student(student_id)
-
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to save grades: {e}")
+                    if con.execute("SELECT 1 FROM transcripts WHERE student_id=? AND course_code=?",(sid,cc)).fetchone():
+                        con.execute("UPDATE transcripts SET grade=? WHERE student_id=? AND course_code=?",(gr,sid,cc))
+                    else: con.execute("INSERT INTO transcripts VALUES (?,?,?)",(sid,cc,gr))
+            con.commit(); con.close()
+            QMessageBox.information(self,"Success","Grades saved.")
+            self.load_transcript_for_student(sid)
+        except Exception as e: QMessageBox.warning(self,"Error",str(e))
 
 
 if __name__ == "__main__":
