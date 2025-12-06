@@ -425,7 +425,7 @@ class AdminDashboard(QMainWindow):
         self.inp_room = QLineEdit()
         self.inp_room.setPlaceholderText("Room (e.g. 25-101)")
         self.inp_cap = QSpinBox()
-        self.inp_cap.setRange(10, 100)
+        self.inp_cap.setRange(1, 100)
         self.inp_cap.setPrefix("Cap: ")
 
         col3.addWidget(self.inp_room)
