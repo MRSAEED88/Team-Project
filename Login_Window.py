@@ -1,37 +1,39 @@
 import sys
 import sqlite3
 import bcrypt
-from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QLineEdit, QPushButton, 
-                             QVBoxLayout, QHBoxLayout, QFrame, QMessageBox, QGraphicsDropShadowEffect)
-from PyQt5.QtCore import Qt, QPropertyAnimation, QPoint
-from PyQt5.QtGui import QFont, QColor, QPixmap
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QLabel, QLineEdit, QPushButton,
+    QVBoxLayout, QHBoxLayout, QFrame, QMessageBox
+)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 # --- IMPORT DASHBOARDS ---
-# Ensure these filenames match your local files
 from student_dashboard import StudentDashboard
-from admin_dashboard import AdminDashboard 
+from admin_dashboard import AdminDashboard
+
 
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("KAU Portal | Secure Login")
-        self.setFixedSize(950, 600)
-        
-        # Remove default title bar for a cleaner look (Optional, can comment out)
-        # self.setWindowFlags(Qt.FramelessWindowHint) 
+
+        # اجعل الواجهة قابلة للتكبير تلقائيًا
+        self.resize(950, 600)
+        self.showMaximized()   # ← أهم سطر
+
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        # --- MAIN LAYOUT (Split Screen) ---
+        # MAIN LAYOUT (Split Screen)
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
-        # 1. Left Panel (Branding)
+        # Panels
         self.setup_left_panel()
-        
-        # 2. Right Panel (Login Form)
         self.setup_right_panel()
 
+    # -------------------------------------------------------
     def setup_left_panel(self):
         self.left_frame = QFrame()
         self.left_frame.setStyleSheet("""
@@ -41,24 +43,23 @@ class LoginWindow(QWidget):
                 border-bottom-left-radius: 15px;
             }
         """)
+
         layout = QVBoxLayout(self.left_frame)
         layout.setContentsMargins(40, 0, 40, 0)
-        
-        # Logo / Text
+
         lbl_logo = QLabel("KAU")
-        lbl_logo.setStyleSheet("color: white; font-size: 60px; font-weight: bold; font-family: 'Segoe UI';")
+        lbl_logo.setStyleSheet("color: white; font-size: 60px; font-weight: bold;")
         lbl_logo.setAlignment(Qt.AlignCenter)
-        
+
         lbl_title = QLabel("Course Registration\nSystem")
-        lbl_title.setStyleSheet("color: #bdc3c7; font-size: 20px; font-family: 'Segoe UI';")
+        lbl_title.setStyleSheet("color: #bdc3c7; font-size: 20px;")
         lbl_title.setAlignment(Qt.AlignCenter)
 
         layout.addStretch()
         layout.addWidget(lbl_logo)
         layout.addWidget(lbl_title)
         layout.addStretch()
-        
-        # Footer
+
         lbl_footer = QLabel("Faculty of Engineering\nFall 2025")
         lbl_footer.setStyleSheet("color: #7f8c8d; font-size: 12px;")
         lbl_footer.setAlignment(Qt.AlignCenter)
@@ -67,6 +68,7 @@ class LoginWindow(QWidget):
 
         self.main_layout.addWidget(self.left_frame)
 
+    # -------------------------------------------------------
     def setup_right_panel(self):
         self.right_frame = QFrame()
         self.right_frame.setStyleSheet("""
@@ -76,24 +78,21 @@ class LoginWindow(QWidget):
                 border-bottom-right-radius: 15px;
             }
         """)
+
         layout = QVBoxLayout(self.right_frame)
         layout.setContentsMargins(60, 60, 60, 60)
         layout.setSpacing(20)
 
-        # Title
         lbl_welcome = QLabel("Welcome Back")
         lbl_welcome.setStyleSheet("color: #2c3e50; font-size: 32px; font-weight: bold;")
-        lbl_welcome.setAlignment(Qt.AlignLeft)
-        
+        layout.addWidget(lbl_welcome)
+
         lbl_sub = QLabel("Please enter your details to sign in.")
         lbl_sub.setStyleSheet("color: #95a5a6; font-size: 14px;")
-        lbl_sub.setAlignment(Qt.AlignLeft)
-
-        layout.addWidget(lbl_welcome)
         layout.addWidget(lbl_sub)
+
         layout.addSpacing(20)
 
-        # Inputs Style
         input_style = """
             QLineEdit {
                 border: 2px solid #e0e0e0;
@@ -108,23 +107,20 @@ class LoginWindow(QWidget):
             }
         """
 
-        # Username Input
         self.inp_user = QLineEdit()
         self.inp_user.setPlaceholderText("University ID or Email")
         self.inp_user.setStyleSheet(input_style)
         layout.addWidget(self.inp_user)
 
-        # Password Input
+        # PASSWORD
         self.inp_pass = QLineEdit()
         self.inp_pass.setPlaceholderText("Password")
         self.inp_pass.setEchoMode(QLineEdit.Password)
         self.inp_pass.setStyleSheet(input_style)
-        self.inp_pass.returnPressed.connect(self.login_user) # Allow Enter key to login
+        self.inp_pass.returnPressed.connect(self.login_user)
         layout.addWidget(self.inp_pass)
 
-        layout.addSpacing(10)
-
-        # Login Button
+        # LOGIN BUTTON
         self.btn_login = QPushButton("Sign In")
         self.btn_login.setCursor(Qt.PointingHandCursor)
         self.btn_login.setStyleSheet("""
@@ -136,12 +132,8 @@ class LoginWindow(QWidget):
                 padding: 12px;
                 border-radius: 8px;
             }
-            QPushButton:hover {
-                background-color: #3498db;
-            }
-            QPushButton:pressed {
-                background-color: #1abc9c;
-            }
+            QPushButton:hover { background-color: #3498db; }
+            QPushButton:pressed { background-color: #1abc9c; }
         """)
         self.btn_login.clicked.connect(self.login_user)
         layout.addWidget(self.btn_login)
@@ -149,9 +141,9 @@ class LoginWindow(QWidget):
         layout.addStretch()
         self.main_layout.addWidget(self.right_frame)
 
-    # =======================================================
-    # LOGIC: AUTHENTICATION
-    # =======================================================
+    # -------------------------------------------------------
+    # LOGIN LOGIC
+    # -------------------------------------------------------
     def login_user(self):
         user_input = self.inp_user.text().strip()
         password = self.inp_pass.text().strip()
@@ -163,83 +155,66 @@ class LoginWindow(QWidget):
         try:
             con = sqlite3.connect("User.db")
             cur = con.cursor()
-            
-            # --- LOGIC: Check 'users' table by Email OR ID ---
-            # We check if the input is numeric (ID) or string (Email) to optimize, 
-            # or just run an OR query.
-            
-            query = "SELECT id, name, email, password, membership FROM users WHERE email=? OR CAST(id AS TEXT)=?"
+
+            query = """
+                SELECT id, name, email, password, membership 
+                FROM users 
+                WHERE email=? OR CAST(id AS TEXT)=?
+            """
             cur.execute(query, (user_input, user_input))
-            
             user = cur.fetchone()
 
             if user:
                 user_id, name, db_email, pw_hash, membership = user
-                
-                # Verify Password (bcrypt support with plain text fallback)
-                is_valid = False
-                if isinstance(pw_hash, str): 
-                    pw_bytes = pw_hash.encode() # Convert DB string to bytes
+
+                # Convert DB value to bytes
+                if isinstance(pw_hash, str):
+                    pw_bytes = pw_hash.encode()
                 else:
                     pw_bytes = pw_hash
-                
-                try:
-                    # Try comparing as bcrypt hash
-                    is_valid = bcrypt.checkpw(password.encode(), pw_bytes)
-                except ValueError:
-                    # Fallback: Plain text comparison (for legacy/test users)
-                    is_valid = (password == pw_hash or password == pw_hash.decode())
 
-                if is_valid:
-                    self.handle_successful_login(user_id, name, db_email, membership)
+                # Password Check
+                valid = False
+                try:
+                    valid = bcrypt.checkpw(password.encode(), pw_bytes)
+                except:
+                    valid = (password == pw_hash or password == pw_bytes.decode())
+
+                if valid:
+                    self.open_dashboard(user_id, name, db_email, membership)
                 else:
-                    QMessageBox.warning(self, "Access Denied", "Incorrect Password.")
+                    QMessageBox.warning(self, "Access Denied", "Incorrect password.")
             else:
-                QMessageBox.warning(self, "Access Denied", "User not found. Please check your ID/Email.")
-            
+                QMessageBox.warning(self, "Access Denied", "User not found.")
+
             con.close()
 
         except Exception as e:
-            QMessageBox.critical(self, "System Error", f"Database Connection Failed:\n{e}")
+            QMessageBox.critical(self, "System Error", f"Database Error:\n{e}")
 
-    def handle_successful_login(self, user_id, name, email, membership):
+    # -------------------------------------------------------
+    def open_dashboard(self, user_id, name, email, membership):
         """
-        Handles post-login logic:
-        1. Syncs 'users' to 'students' table if missing.
-        2. Routes to correct dashboard.
+        Opens the correct dashboard based on membership.
         """
-        
-        # --- AUTOMATION: Sync Student Profile if Missing ---
-        if membership == "student":
-            try:
-                con = sqlite3.connect("User.db")
-                cur = con.cursor()
-                cur.execute("SELECT id FROM students WHERE id=?", (user_id,))
-                if not cur.fetchone():
-                    # Create profile automatically
-                    cur.execute("INSERT INTO students (id, name, email, program, level) VALUES (?, ?, ?, ?, ?)",
-                                (user_id, name, email, "General Engineering", 1))
-                    con.commit()
-                con.close()
-            except Exception as e:
-                print(f"Auto-sync warning: {e}")
-
-        # --- ROUTING ---
         if membership.lower() == "admin":
             self.dashboard = AdminDashboard(user_id)
         else:
             self.dashboard = StudentDashboard(user_id)
-        
+
         self.dashboard.show()
         self.close()
 
+
+# -----------------------------------------------------------
+# MAIN APP
+# -----------------------------------------------------------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    # Global Font Setup
+
     font = QFont("Segoe UI", 10)
     app.setFont(font)
-    
+
     window = LoginWindow()
     window.show()
     sys.exit(app.exec_())
