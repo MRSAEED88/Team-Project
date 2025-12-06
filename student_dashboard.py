@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout,
                              QTableWidgetItem, QHeaderView, QFrame, QStackedWidget,
                              QAbstractItemView, QMessageBox, QLineEdit, QComboBox, QSpinBox)
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QColor, QBrush
+from PyQt5.QtGui import QFont, QColor, QBrush, QPixmap
 
 # --- IMPORTS ---
 from registration_system import RegistrationSystem
@@ -16,13 +16,10 @@ import users_db
 class SimulationLogic:
     """
     Helper logic specifically for the What-If scenarios.
+    Checks for 'softer conflicts' like back-to-back classes in different rooms.
     """
     @staticmethod
     def check_soft_conflicts(courses_data, selected_codes):
-        """
-        Checks for 'Soft Conflicts' like back-to-back classes in different rooms.
-        Returns a list of warning messages.
-        """
         warnings = []
         
         # 1. Gather Schedule Details for selected courses
@@ -111,16 +108,12 @@ class OverviewTab(QWidget):
         card = QFrame()
         card.setProperty("class", "card")
         card.setStyleSheet(f"border-top: 4px solid {color}; background: white; border-radius: 8px;")
-        
         l = QVBoxLayout(card)
         l.setContentsMargins(20, 20, 20, 20)
-        
         lbl_title = QLabel(title)
         lbl_title.setStyleSheet("color: #7f8c8d; font-size: 14px; font-weight: bold;")
-        
         lbl_value = QLabel(value)
         lbl_value.setStyleSheet("color: #2c3e50; font-size: 28px; font-weight: bold;")
-        
         l.addWidget(lbl_title)
         l.addWidget(lbl_value)
         return card
@@ -149,7 +142,7 @@ class OverviewTab(QWidget):
         except: pass
 
 # =============================================================================
-# TAB 2: REGISTRATION (With Plan Filtering + Soft Conflict Check)
+# TAB 2: REGISTRATION
 # =============================================================================
 class RegistrationTab(QWidget):
     def __init__(self, parent_dashboard):
@@ -233,22 +226,18 @@ class RegistrationTab(QWidget):
         if code in current_registered:
             return QMessageBox.warning(self, "Warning", "Already registered.")
 
-        # --- BONUS #7: SOFT CONFLICT CHECK ---
-        # We simulate adding this course to the current schedule
+        # --- BONUS CHECK: SOFT CONFLICTS ---
         simulated_schedule = list(current_registered)
         simulated_schedule.append(code)
-        
         warnings = SimulationLogic.check_soft_conflicts(
             self.dash.logic_system.courses_data, 
             simulated_schedule
         )
-        
         if warnings:
             msg_text = "Soft Scheduling Conflict Detected:\n\n" + "\n".join(warnings) + "\n\nDo you still want to proceed?"
             reply = QMessageBox.question(self, "Soft Conflict Warning", msg_text, QMessageBox.Yes | QMessageBox.No)
-            if reply == QMessageBox.No:
-                return
-        # -------------------------------------
+            if reply == QMessageBox.No: return
+        # -----------------------------------
 
         ok, msg = self.dash.logic_system.register_courses_for_student(self.dash.student_obj, [code])
         if ok: QMessageBox.information(self, "Info", msg)
@@ -319,19 +308,15 @@ class ScheduleTab(QWidget):
         my_codes = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
         data = self.dash.logic_system.courses_data
         colors = ["#e74c3c", "#3498db", "#2ecc71", "#9b59b6", "#f1c40f", "#e67e22"]
-        
         d_map = {"Sunday":0, "Monday":1, "Tuesday":2, "Wednesday":3, "Thursday":4, 
                  "Sun":0, "Mon":1, "Tue":2, "Wed":3, "Thu":4}
-        
-        color_i = 0
-        tot_creds = 0
+        color_i = 0; tot_creds = 0
 
         for c in my_codes:
             d = data.get(c, {})
             name = d.get('name', 'Unknown')
             room = d.get('room', 'TBA')
             tot_creds += d.get('credits', 0)
-            
             raw_day_str = str(d.get('day', '')).strip()
             start = d.get('start_time')
             end = d.get('end_time')
@@ -346,7 +331,6 @@ class ScheduleTab(QWidget):
             if start and end:
                 normalized_days = raw_day_str.replace('/', ',')
                 day_list = [x.strip() for x in normalized_days.split(',')]
-
                 for single_day in day_list:
                     if single_day in d_map:
                         try:
@@ -356,18 +340,14 @@ class ScheduleTab(QWidget):
                             e_hour = int(str(end).split(':')[0])
                             dur = e_hour - s_hour
                             if dur < 1: dur = 1
-                            
                             if 0 <= row_s < 11:
                                 item = QTableWidgetItem(f"{c}\n{room}")
                                 item.setBackground(QBrush(QColor(colors[color_i % 6])))
                                 item.setForeground(QBrush(Qt.white))
                                 item.setTextAlignment(Qt.AlignCenter)
-                                
                                 for i in range(dur):
-                                    if row_s + i < 11: 
-                                        self.cal.setItem(row_s + i, col, QTableWidgetItem(item))
-                        except Exception as e:
-                            print(f"Error drawing {c} on {single_day}: {e}")
+                                    if row_s + i < 11: self.cal.setItem(row_s + i, col, QTableWidgetItem(item))
+                        except: pass
                 color_i += 1
         
         try:
@@ -403,10 +383,7 @@ class ScheduleTab(QWidget):
         self.dash.refresh_ui()
 
 # =============================================================================
-# BONUS #7: WHAT-IF SCENARIO TAB
-# =============================================================================
-# =============================================================================
-# BONUS #7: WHAT-IF SCENARIO TAB (UPDATED: MULTI-COURSE PLANNING)
+# BONUS #7: WHAT-IF SCENARIO TAB (MULTI-COURSE + VISUALS)
 # =============================================================================
 class WhatIfTab(QWidget):
     def __init__(self, parent_dashboard):
@@ -420,7 +397,7 @@ class WhatIfTab(QWidget):
         title = QLabel("What-If Simulator")
         title.setProperty("class", "page-title")
         layout.addWidget(title)
-
+        
         # 1. Controls Area
         controls_frame = QFrame()
         controls_frame.setProperty("class", "card")
@@ -428,11 +405,9 @@ class WhatIfTab(QWidget):
         
         self.cmb_prog = QComboBox()
         self.cmb_prog.addItems(["Computer", "Comm", "Power", "Biomedical"])
-        
         self.spin_lvl = QSpinBox()
         self.spin_lvl.setRange(1, 10)
         self.spin_lvl.setPrefix("Level ")
-
         btn_sim = QPushButton("Load Course Options")
         btn_sim.setProperty("class", "action-btn")
         btn_sim.clicked.connect(self.run_simulation_list)
@@ -450,7 +425,7 @@ class WhatIfTab(QWidget):
 
         # LEFT: Course List
         list_layout = QVBoxLayout()
-        lbl_list = QLabel("Click courses to add to simulation:")
+        lbl_list = QLabel("Click courses to add/remove from simulation:")
         lbl_list.setStyleSheet("font-weight:bold; color:#7f8c8d;")
         list_layout.addWidget(lbl_list)
 
@@ -466,7 +441,6 @@ class WhatIfTab(QWidget):
         btn_clear = QPushButton("Clear Simulation")
         btn_clear.clicked.connect(self.clear_simulation)
         list_layout.addWidget(btn_clear)
-        
         content_split.addLayout(list_layout, stretch=1)
 
         # RIGHT: Visual Timetable
@@ -501,7 +475,6 @@ class WhatIfTab(QWidget):
     def clear_simulation(self):
         self.simulated_courses.clear()
         self.draw_schedule_grid()
-        # Reset row colors
         for r in range(self.table.rowCount()):
             for c in range(3):
                 item = self.table.item(r, c)
@@ -523,7 +496,6 @@ class WhatIfTab(QWidget):
         courses_db = self.dash.logic_system.courses_data
 
         self.table.setRowCount(0)
-        # Sort for neatness
         for code in sorted(list(allowed_courses)):
             d = courses_db.get(code, {})
             name = d.get('name', 'Unknown')
@@ -548,53 +520,34 @@ class WhatIfTab(QWidget):
             self.table.setItem(row, 2, item_status)
 
     def toggle_course_selection(self, item):
-        """Adds or removes a course from the temporary simulation."""
         row = item.row()
         code = self.table.item(row, 0).text()
         status = self.table.item(row, 2).text()
 
-        # Don't allow selecting courses that are already registered or completed
-        if "Registered" in status or "Completed" in status:
-            return
+        if "Registered" in status or "Completed" in status: return
 
         if code in self.simulated_courses:
             self.simulated_courses.remove(code)
-            # Reset color
             for c in range(3): self.table.item(row, c).setBackground(QBrush(Qt.white))
         else:
             self.simulated_courses.add(code)
-            # Highlight row
-            for c in range(3): self.table.item(row, c).setBackground(QBrush(QColor("#fff3e0"))) # Light orange
+            for c in range(3): self.table.item(row, c).setBackground(QBrush(QColor("#fff3e0")))
 
         self.draw_schedule_grid()
 
     def draw_schedule_grid(self):
-        """
-        Draws the weekly schedule.
-        - Actual registered courses in BLUE.
-        - ALL Simulated courses in ORANGE.
-        """
         self.sim_cal.clearContents()
-        
-        # 1. Actual Courses
         registered_codes = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
-        
-        # 2. Combine Lists
         courses_to_draw = []
-        for c in registered_codes:
-            courses_to_draw.append({"code": c, "color": "#3498db", "type": "actual"}) # Blue
+        for c in registered_codes: courses_to_draw.append({"code": c, "color": "#3498db", "type": "actual"})
+        for c in self.simulated_courses: courses_to_draw.append({"code": c, "color": "#e67e22", "type": "simulated"})
 
-        for c in self.simulated_courses:
-            courses_to_draw.append({"code": c, "color": "#e67e22", "type": "simulated"}) # Orange
-
-        # 3. Draw
         data = self.dash.logic_system.courses_data
         d_map = {"Sun":0, "Mon":1, "Tue":2, "Wed":3, "Thu":4}
 
         for item_info in courses_to_draw:
             c_code = item_info["code"]
             c_color = item_info["color"]
-            
             d = data.get(c_code, {})
             room = d.get('room', 'TBA')
             raw_day_str = str(d.get('day', '')).strip()
@@ -604,7 +557,6 @@ class WhatIfTab(QWidget):
             if start and end:
                 normalized_days = raw_day_str.replace('/', ',')
                 day_list = [x.strip() for x in normalized_days.split(',')]
-
                 for single_day in day_list:
                     if single_day in d_map:
                         try:
@@ -614,41 +566,26 @@ class WhatIfTab(QWidget):
                             e_hour = int(str(end).split(':')[0])
                             dur = e_hour - s_hour
                             if dur < 1: dur = 1
-                            
                             if 0 <= row_s < 11:
                                 cell_text = f"{c_code}\n{room}"
-                                if item_info["type"] == "simulated":
-                                    cell_text += "\n(PLAN)"
-
+                                if item_info["type"] == "simulated": cell_text += "\n(PLAN)"
                                 cell = QTableWidgetItem(cell_text)
                                 cell.setBackground(QBrush(QColor(c_color)))
                                 cell.setForeground(QBrush(Qt.white))
                                 cell.setTextAlignment(Qt.AlignCenter)
-                                
                                 for i in range(dur):
-                                    if row_s + i < 11: 
-                                        self.sim_cal.setItem(row_s + i, col, QTableWidgetItem(cell))
+                                    if row_s + i < 11: self.sim_cal.setItem(row_s + i, col, QTableWidgetItem(cell))
                         except: pass
 
     def check_full_plan_conflicts(self):
         if not self.simulated_courses:
             return QMessageBox.information(self, "Info", "No courses simulated yet.")
-
-        # Combine Actual + All Simulated
+        
         current_registered = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
         full_plan = list(current_registered) + list(self.simulated_courses)
-
-        # Run Soft Conflict Check
-        warnings = SimulationLogic.check_soft_conflicts(
-            self.dash.logic_system.courses_data, 
-            full_plan
-        )
-
-        # Also check for HARD conflicts (Time Overlaps) manually here if needed,
-        # but the prompt specifically asked for the Soft Conflict/What-If Bonus logic.
+        warnings = SimulationLogic.check_soft_conflicts(self.dash.logic_system.courses_data, full_plan)
         
         msg = f"Analyzing plan with {len(full_plan)} courses (Actual + Simulated)...\n\n"
-        
         if warnings:
             msg += "⚠️ Soft Conflicts Found:\n" + "\n".join(warnings)
             QMessageBox.warning(self, "Plan Analysis", msg)
@@ -656,32 +593,8 @@ class WhatIfTab(QWidget):
             msg += "✅ No scheduling conflicts detected in this plan!"
             QMessageBox.information(self, "Plan Analysis", msg)
 
-    def check_hypothetical_conflict(self):
-        # ... (Same logic as before) ...
-        r = self.table.currentRow()
-        if r < 0: return QMessageBox.warning(self, "Error", "Select a course first.")
-        
-        code = self.table.item(r, 0).text()
-        
-        # Simulate adding this to CURRENT schedule
-        current_registered = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
-        simulated_schedule = list(current_registered)
-        simulated_schedule.append(code)
-
-        # Run Soft Conflict Check
-        warnings = SimulationLogic.check_soft_conflicts(
-            self.dash.logic_system.courses_data, 
-            simulated_schedule
-        )
-
-        if warnings:
-            QMessageBox.warning(self, "Simulated Conflict", "Soft Conflict Found:\n" + "\n".join(warnings))
-        else:
-            QMessageBox.information(self, "Result", f"No soft conflicts! {code} fits your schedule.")
-
-
 # =============================================================================
-# TAB 6: SETTINGS (NEW PROFILE MAINTENANCE)
+# TAB 6: SETTINGS
 # =============================================================================
 class SettingsTab(QWidget):
     def __init__(self, parent_dashboard):
@@ -695,39 +608,27 @@ class SettingsTab(QWidget):
         title.setProperty("class", "page-title")
         layout.addWidget(title)
 
-        # Email
         layout.addWidget(QLabel("Update Email", styleSheet="font-weight:bold; font-size:14px; margin-top:10px;"))
-        self.inp_email = QLineEdit()
-        self.inp_email.setPlaceholderText("New email")
+        self.inp_email = QLineEdit(); self.inp_email.setPlaceholderText("New email")
         layout.addWidget(self.inp_email)
-        
-        btn_email = QPushButton("Save New Email")
-        btn_email.setProperty("class", "action-btn")
+        btn_email = QPushButton("Save New Email"); btn_email.setProperty("class", "action-btn")
         btn_email.clicked.connect(self.update_email)
         layout.addWidget(btn_email)
 
-        # Separator
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setStyleSheet("color: #ccc; margin: 20px 0;")
+        line = QFrame(); line.setFrameShape(QFrame.HLine); line.setStyleSheet("color: #ccc; margin: 20px 0;")
         layout.addWidget(line)
 
-        # Password
         layout.addWidget(QLabel("Change Password", styleSheet="font-weight:bold; font-size:14px;"))
         self.inp_old = QLineEdit(); self.inp_old.setPlaceholderText("Current Password"); self.inp_old.setEchoMode(QLineEdit.Password)
         self.inp_new = QLineEdit(); self.inp_new.setPlaceholderText("New Password"); self.inp_new.setEchoMode(QLineEdit.Password)
-        layout.addWidget(self.inp_old)
-        layout.addWidget(self.inp_new)
+        layout.addWidget(self.inp_old); layout.addWidget(self.inp_new)
 
-        btn_pass = QPushButton("Update Password")
-        btn_pass.setProperty("class", "warning-btn")
+        btn_pass = QPushButton("Update Password"); btn_pass.setProperty("class", "warning-btn")
         btn_pass.clicked.connect(self.update_password)
-        layout.addWidget(btn_pass)
-        layout.addStretch()
+        layout.addWidget(btn_pass); layout.addStretch()
 
     def refresh(self):
-        if self.dash.student_obj:
-            self.inp_email.setText(self.dash.student_obj.email)
+        if self.dash.student_obj: self.inp_email.setText(self.dash.student_obj.email)
 
     def update_email(self):
         new_e = self.inp_email.text().strip()
@@ -775,18 +676,33 @@ class StudentDashboard(QMainWindow):
         sidebar.setObjectName("Sidebar")
         sidebar.setFixedWidth(240)
         sl = QVBoxLayout(sidebar)
-        
-        logo = QLabel("KAU Portal")
-        logo.setObjectName("LogoLabel")
-        sl.addWidget(logo)
+        sl.setSpacing(15)  # Spacing for logo
+
+        # --- UPDATED LOGO SECTION ---
+        img_label = QLabel()
+        img_label.setAlignment(Qt.AlignCenter)
+        pixmap = QPixmap("kau_logo.png") 
+        if not pixmap.isNull():
+            scaled = pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            img_label.setPixmap(scaled)
+        else:
+            img_label.setText("ECE Department")
+            img_label.setStyleSheet("color: #bdc3c7; font-weight: bold;")
+        sl.addWidget(img_label)
+
+        text_logo = QLabel("ECE Registration\nSystem")
+        text_logo.setObjectName("LogoLabel")
+        text_logo.setAlignment(Qt.AlignCenter)
+        text_logo.setWordWrap(True) 
+        text_logo.setStyleSheet("font-size: 18px; font-weight: bold; color: #ecf0f1; padding: 10px;")
+        sl.addWidget(text_logo)
+        # ----------------------------
         
         self.stack = QStackedWidget()
         
-        # Tabs
         self.tab_overview = OverviewTab(self)
         self.tab_register = RegistrationTab(self)
         self.tab_schedule = ScheduleTab(self)
-        
         self.tab_trans = QWidget(); tl = QVBoxLayout(self.tab_trans)
         tl.setContentsMargins(30,30,30,30)
         tl_title = QLabel("Transcript"); tl_title.setProperty("class", "page-title"); tl.addWidget(tl_title)
@@ -797,9 +713,7 @@ class StudentDashboard(QMainWindow):
         pl_title = QLabel("Program Plan"); pl_title.setProperty("class", "page-title"); pl.addWidget(pl_title)
         self.tbl_plan = QTableWidget(0,5); self.tbl_plan.setHorizontalHeaderLabels(["Level","Code","Name","Credits","Status"]); self.tbl_plan.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch); pl.addWidget(self.tbl_plan)
 
-        # NEW TAB FOR BONUS #7
         self.tab_whatif = WhatIfTab(self)
-
         self.tab_settings = SettingsTab(self)
 
         for t in [self.tab_overview, self.tab_register, self.tab_schedule, self.tab_trans, self.tab_plan, self.tab_whatif, self.tab_settings]:
@@ -816,6 +730,14 @@ class StudentDashboard(QMainWindow):
             sl.addWidget(b); self.btns.append(b)
         
         sl.addStretch()
+
+        # --- LOGOUT BUTTON ---
+        btn_logout = QPushButton("Log Out")
+        btn_logout.setProperty("class", "nav-btn")
+        btn_logout.clicked.connect(self.handle_logout)
+        sl.addWidget(btn_logout)
+        # ---------------------
+
         self.lbl_user = QLabel("Loading...")
         self.lbl_user.setStyleSheet("color:white; padding:10px; font-weight:bold;")
         sl.addWidget(self.lbl_user)
@@ -851,6 +773,13 @@ class StudentDashboard(QMainWindow):
         self.stack.setCurrentIndex(i)
         self.refresh_ui()
 
+    def handle_logout(self):
+        # We import here to avoid circular dependencies with Login_Window.py
+        from Login_Window import LoginWindow
+        self.login_window = LoginWindow()
+        self.login_window.showMaximized()
+        self.close()
+
     def load_data(self):
         try:
             con = sqlite3.connect("User.db")
@@ -861,7 +790,6 @@ class StudentDashboard(QMainWindow):
                 if u: 
                     cur.execute("INSERT INTO students VALUES (?,?,?,?,?)", (self.user_id, u[0], u[1], "General Engineering", 1))
                     con.commit(); row = (u[0], u[1], "General Engineering", 1)
-            
             if row:
                 self.student_obj = Student(self.user_id, row[0], row[1], row[2], row[3], "")
                 self.lbl_user.setText(f"{row[0]}\n{row[2]}")
@@ -897,7 +825,6 @@ class StudentDashboard(QMainWindow):
                 st, col = ("Not Started", "#f8d7da")
                 if code in reg: st, col = ("In Progress", "#cce5ff")
                 elif code in comp: st, col = ("Completed", "#d4edda")
-                
                 r = self.tbl_plan.rowCount(); self.tbl_plan.insertRow(r)
                 for i, txt in enumerate([f"Level {lvl}", code, d.get('name','-'), str(d.get('credits','-')), st]):
                     it = QTableWidgetItem(txt); 
