@@ -3,7 +3,7 @@ import sqlite3
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QFrame, QStackedWidget,
-                             QAbstractItemView, QMessageBox, QLineEdit)
+                             QAbstractItemView, QMessageBox, QLineEdit, QComboBox, QSpinBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor, QBrush
 
@@ -11,6 +11,74 @@ from PyQt5.QtGui import QFont, QColor, QBrush
 from registration_system import RegistrationSystem
 from Student import Student
 import users_db
+
+
+class SimulationLogic:
+    """
+    Helper logic specifically for the What-If scenarios.
+    """
+    @staticmethod
+    def check_soft_conflicts(courses_data, selected_codes):
+        """
+        Checks for 'Soft Conflicts' like back-to-back classes in different rooms.
+        Returns a list of warning messages.
+        """
+        warnings = []
+        
+        # 1. Gather Schedule Details for selected courses
+        schedule_points = []
+        
+        for code in selected_codes:
+            data = courses_data.get(code, {})
+            room = data.get('room', 'Unknown')
+            schedule_list = data.get('schedule', [])
+            
+            for item in schedule_list:
+                days_str, start_str, end_str = item
+                # Handle "Sun/Tue" or "Sun, Tue"
+                days = days_str.replace('/', ',').split(',')
+                
+                # Convert times to minutes for comparison
+                try:
+                    s_h, s_m = map(int, start_str.split(':'))
+                    e_h, e_m = map(int, end_str.split(':'))
+                    start_min = s_h * 60 + s_m
+                    end_min = e_h * 60 + e_m
+                    
+                    for day in days:
+                        schedule_points.append({
+                            'day': day.strip(),
+                            'start': start_min,
+                            'end': end_min,
+                            'room': room,
+                            'code': code
+                        })
+                except:
+                    continue
+
+        # 2. Sort by Day, then by Start Time
+        schedule_points.sort(key=lambda x: (x['day'], x['start']))
+
+        # 3. Check for Back-to-Back (End Time A == Start Time B)
+        for i in range(len(schedule_points) - 1):
+            curr = schedule_points[i]
+            next_c = schedule_points[i+1]
+            
+            # Must be same day
+            if curr['day'] == next_c['day']:
+                # Check for tight transition (0 to 10 minutes gap)
+                gap = next_c['start'] - curr['end']
+                
+                if 0 <= gap <= 10:
+                    # Ignore if it's the same room
+                    if curr['room'] != next_c['room']:
+                        warnings.append(
+                            f"Tight Transition ({curr['day']}): {curr['code']} ends at "
+                            f"{curr['end']//60}:{curr['end']%60:02d} in {curr['room']}, "
+                            f"but {next_c['code']} starts immediately in {next_c['room']}."
+                        )
+
+        return warnings
 
 # =============================================================================
 # TAB 1: OVERVIEW (GPA & Stats)
@@ -81,7 +149,7 @@ class OverviewTab(QWidget):
         except: pass
 
 # =============================================================================
-# TAB 2: REGISTRATION (With Plan Filtering)
+# TAB 2: REGISTRATION (With Plan Filtering + Soft Conflict Check)
 # =============================================================================
 class RegistrationTab(QWidget):
     def __init__(self, parent_dashboard):
@@ -161,8 +229,26 @@ class RegistrationTab(QWidget):
         if r < 0: return QMessageBox.warning(self, "Warning", "Select a course.")
         code = self.table.item(r, 0).text()
         
-        if code in self.dash.logic_system.get_student_registered_courses(self.dash.student_obj):
+        current_registered = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
+        if code in current_registered:
             return QMessageBox.warning(self, "Warning", "Already registered.")
+
+        # --- BONUS #7: SOFT CONFLICT CHECK ---
+        # We simulate adding this course to the current schedule
+        simulated_schedule = list(current_registered)
+        simulated_schedule.append(code)
+        
+        warnings = SimulationLogic.check_soft_conflicts(
+            self.dash.logic_system.courses_data, 
+            simulated_schedule
+        )
+        
+        if warnings:
+            msg_text = "Soft Scheduling Conflict Detected:\n\n" + "\n".join(warnings) + "\n\nDo you still want to proceed?"
+            reply = QMessageBox.question(self, "Soft Conflict Warning", msg_text, QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+        # -------------------------------------
 
         ok, msg = self.dash.logic_system.register_courses_for_student(self.dash.student_obj, [code])
         if ok: QMessageBox.information(self, "Info", msg)
@@ -172,8 +258,6 @@ class RegistrationTab(QWidget):
 # =============================================================================
 # TAB 3: SCHEDULE (Visual & Lists)
 # =============================================================================
-# [In student_dashboard.py]
-
 class ScheduleTab(QWidget):
     def __init__(self, parent_dashboard):
         super().__init__()
@@ -236,7 +320,6 @@ class ScheduleTab(QWidget):
         data = self.dash.logic_system.courses_data
         colors = ["#e74c3c", "#3498db", "#2ecc71", "#9b59b6", "#f1c40f", "#e67e22"]
         
-        # Mapping for day names
         d_map = {"Sunday":0, "Monday":1, "Tuesday":2, "Wednesday":3, "Thursday":4, 
                  "Sun":0, "Mon":1, "Tue":2, "Wed":3, "Thu":4}
         
@@ -249,12 +332,10 @@ class ScheduleTab(QWidget):
             room = d.get('room', 'TBA')
             tot_creds += d.get('credits', 0)
             
-            # 1. Get the raw day string (e.g., "Sun, Tue" or "Mon/Wed")
             raw_day_str = str(d.get('day', '')).strip()
             start = d.get('start_time')
             end = d.get('end_time')
 
-            # List View Update
             r = self.list.rowCount()
             self.list.insertRow(r)
             self.list.setItem(r, 0, QTableWidgetItem(str(c)))
@@ -262,49 +343,37 @@ class ScheduleTab(QWidget):
             self.list.setItem(r, 2, QTableWidgetItem(f"{raw_day_str} {start}"))
             self.list.setItem(r, 3, QTableWidgetItem(room))
 
-            # 2. Calendar View Update (The Fix)
             if start and end:
-                # Normalize separators: replace '/' with ',' just in case CSV used slashes
                 normalized_days = raw_day_str.replace('/', ',')
-                
-                # Split into a list: "Sun, Tue" -> ["Sun", "Tue"]
                 day_list = [x.strip() for x in normalized_days.split(',')]
 
                 for single_day in day_list:
                     if single_day in d_map:
                         try:
                             col = d_map[single_day]
-                            # Calculate Start Row (assuming 8:00 is index 0)
                             s_hour = int(str(start).split(':')[0])
                             row_s = s_hour - 8
-                            
-                            # Calculate Duration
                             e_hour = int(str(end).split(':')[0])
                             dur = e_hour - s_hour
-                            if dur < 1: dur = 1 # Minimum 1 hour block
+                            if dur < 1: dur = 1
                             
-                            # Paint Cells
                             if 0 <= row_s < 11:
                                 item = QTableWidgetItem(f"{c}\n{room}")
                                 item.setBackground(QBrush(QColor(colors[color_i % 6])))
                                 item.setForeground(QBrush(Qt.white))
                                 item.setTextAlignment(Qt.AlignCenter)
                                 
-                                # Loop to fill duration (e.g. 2 hour lab)
                                 for i in range(dur):
                                     if row_s + i < 11: 
                                         self.cal.setItem(row_s + i, col, QTableWidgetItem(item))
                         except Exception as e:
                             print(f"Error drawing {c} on {single_day}: {e}")
-                
                 color_i += 1
         
-        # Update Total Credits in Overview
         try:
             self.dash.tab_overview.card_credits.layout().itemAt(1).widget().setText(f"{tot_creds} / 18")
         except: pass
 
-        # Load Waitlist Data
         con = sqlite3.connect("User.db")
         cur = con.cursor()
         cur.execute("SELECT course_code, timestamp FROM waitlist WHERE student_id=?", (self.dash.user_id,))
@@ -332,6 +401,284 @@ class ScheduleTab(QWidget):
             con.execute("DELETE FROM waitlist WHERE student_id=? AND course_code=?", (self.dash.user_id, code))
         QMessageBox.information(self, "Info", "Left waitlist.")
         self.dash.refresh_ui()
+
+# =============================================================================
+# BONUS #7: WHAT-IF SCENARIO TAB
+# =============================================================================
+# =============================================================================
+# BONUS #7: WHAT-IF SCENARIO TAB (UPDATED: MULTI-COURSE PLANNING)
+# =============================================================================
+class WhatIfTab(QWidget):
+    def __init__(self, parent_dashboard):
+        super().__init__()
+        self.dash = parent_dashboard
+        self.simulated_courses = set()  # Stores codes of temporarily selected courses
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+
+        title = QLabel("What-If Simulator")
+        title.setProperty("class", "page-title")
+        layout.addWidget(title)
+
+        # 1. Controls Area
+        controls_frame = QFrame()
+        controls_frame.setProperty("class", "card")
+        cl = QHBoxLayout(controls_frame)
+        
+        self.cmb_prog = QComboBox()
+        self.cmb_prog.addItems(["Computer", "Comm", "Power", "Biomedical"])
+        
+        self.spin_lvl = QSpinBox()
+        self.spin_lvl.setRange(1, 10)
+        self.spin_lvl.setPrefix("Level ")
+
+        btn_sim = QPushButton("Load Course Options")
+        btn_sim.setProperty("class", "action-btn")
+        btn_sim.clicked.connect(self.run_simulation_list)
+
+        cl.addWidget(QLabel("Simulate Program:"))
+        cl.addWidget(self.cmb_prog)
+        cl.addWidget(QLabel("Simulate Level:"))
+        cl.addWidget(self.spin_lvl)
+        cl.addWidget(btn_sim)
+        cl.addStretch()
+        layout.addWidget(controls_frame)
+
+        # 2. Main Content Area (Split: List vs Visual)
+        content_split = QHBoxLayout()
+
+        # LEFT: Course List
+        list_layout = QVBoxLayout()
+        lbl_list = QLabel("Click courses to add to simulation:")
+        lbl_list.setStyleSheet("font-weight:bold; color:#7f8c8d;")
+        list_layout.addWidget(lbl_list)
+
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Code", "Name", "Status"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setMinimumWidth(350)
+        self.table.itemClicked.connect(self.toggle_course_selection)
+        list_layout.addWidget(self.table)
+        
+        btn_clear = QPushButton("Clear Simulation")
+        btn_clear.clicked.connect(self.clear_simulation)
+        list_layout.addWidget(btn_clear)
+        
+        content_split.addLayout(list_layout, stretch=1)
+
+        # RIGHT: Visual Timetable
+        vis_layout = QVBoxLayout()
+        lbl_vis = QLabel("Simulated Plan (Blue=Actual, Orange=Hypothetical)")
+        lbl_vis.setStyleSheet("font-weight:bold; color:#7f8c8d;")
+        vis_layout.addWidget(lbl_vis)
+
+        self.sim_cal = QTableWidget(11, 5)
+        self.sim_cal.setHorizontalHeaderLabels(["Sun", "Mon", "Tue", "Wed", "Thu"])
+        self.sim_cal.setVerticalHeaderLabels([f"{h}:00" for h in range(8, 19)])
+        self.sim_cal.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.sim_cal.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.sim_cal.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        vis_layout.addWidget(self.sim_cal)
+        content_split.addLayout(vis_layout, stretch=2)
+
+        layout.addLayout(content_split)
+
+        # 3. Conflict Button
+        btn_check = QPushButton("Analyze Full Plan for Conflicts")
+        btn_check.setProperty("class", "warning-btn")
+        btn_check.clicked.connect(self.check_full_plan_conflicts)
+        layout.addWidget(btn_check)
+
+    def refresh(self):
+        if self.dash.student_obj:
+            self.cmb_prog.setCurrentText(self.dash.student_obj.program)
+            self.spin_lvl.setValue(self.dash.student_obj.level)
+        self.clear_simulation()
+
+    def clear_simulation(self):
+        self.simulated_courses.clear()
+        self.draw_schedule_grid()
+        # Reset row colors
+        for r in range(self.table.rowCount()):
+            for c in range(3):
+                item = self.table.item(r, c)
+                if item: item.setBackground(QBrush(Qt.white))
+
+    def run_simulation_list(self):
+        """Populates the list. Resets current simulation."""
+        self.simulated_courses.clear()
+        self.draw_schedule_grid()
+
+        sim_prog = self.cmb_prog.currentText()
+        plan_dict = self.dash.logic_system.program_plan.get(sim_prog, {})
+        allowed_courses = set()
+        for level_courses in plan_dict.values():
+            for c in level_courses: allowed_courses.add(c)
+
+        completed = users_db.get_completed_courses(self.dash.user_id)
+        current_reg = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
+        courses_db = self.dash.logic_system.courses_data
+
+        self.table.setRowCount(0)
+        # Sort for neatness
+        for code in sorted(list(allowed_courses)):
+            d = courses_db.get(code, {})
+            name = d.get('name', 'Unknown')
+            prereqs = d.get('prerequisites', [])
+            
+            status = "Eligible"
+            if code in completed: status = "Completed"
+            elif code in current_reg: status = "Registered"
+            else:
+                missing = [p for p in prereqs if p not in completed]
+                if missing: status = "Missing Prereqs"
+
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(code))
+            self.table.setItem(row, 1, QTableWidgetItem(name))
+            
+            item_status = QTableWidgetItem(status)
+            if "Missing" in status: item_status.setForeground(QBrush(QColor("red")))
+            elif "Completed" in status or "Registered" in status: item_status.setForeground(QBrush(QColor("green")))
+            else: item_status.setForeground(QBrush(QColor("blue")))
+            self.table.setItem(row, 2, item_status)
+
+    def toggle_course_selection(self, item):
+        """Adds or removes a course from the temporary simulation."""
+        row = item.row()
+        code = self.table.item(row, 0).text()
+        status = self.table.item(row, 2).text()
+
+        # Don't allow selecting courses that are already registered or completed
+        if "Registered" in status or "Completed" in status:
+            return
+
+        if code in self.simulated_courses:
+            self.simulated_courses.remove(code)
+            # Reset color
+            for c in range(3): self.table.item(row, c).setBackground(QBrush(Qt.white))
+        else:
+            self.simulated_courses.add(code)
+            # Highlight row
+            for c in range(3): self.table.item(row, c).setBackground(QBrush(QColor("#fff3e0"))) # Light orange
+
+        self.draw_schedule_grid()
+
+    def draw_schedule_grid(self):
+        """
+        Draws the weekly schedule.
+        - Actual registered courses in BLUE.
+        - ALL Simulated courses in ORANGE.
+        """
+        self.sim_cal.clearContents()
+        
+        # 1. Actual Courses
+        registered_codes = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
+        
+        # 2. Combine Lists
+        courses_to_draw = []
+        for c in registered_codes:
+            courses_to_draw.append({"code": c, "color": "#3498db", "type": "actual"}) # Blue
+
+        for c in self.simulated_courses:
+            courses_to_draw.append({"code": c, "color": "#e67e22", "type": "simulated"}) # Orange
+
+        # 3. Draw
+        data = self.dash.logic_system.courses_data
+        d_map = {"Sun":0, "Mon":1, "Tue":2, "Wed":3, "Thu":4}
+
+        for item_info in courses_to_draw:
+            c_code = item_info["code"]
+            c_color = item_info["color"]
+            
+            d = data.get(c_code, {})
+            room = d.get('room', 'TBA')
+            raw_day_str = str(d.get('day', '')).strip()
+            start = d.get('start_time')
+            end = d.get('end_time')
+
+            if start and end:
+                normalized_days = raw_day_str.replace('/', ',')
+                day_list = [x.strip() for x in normalized_days.split(',')]
+
+                for single_day in day_list:
+                    if single_day in d_map:
+                        try:
+                            col = d_map[single_day]
+                            s_hour = int(str(start).split(':')[0])
+                            row_s = s_hour - 8
+                            e_hour = int(str(end).split(':')[0])
+                            dur = e_hour - s_hour
+                            if dur < 1: dur = 1
+                            
+                            if 0 <= row_s < 11:
+                                cell_text = f"{c_code}\n{room}"
+                                if item_info["type"] == "simulated":
+                                    cell_text += "\n(PLAN)"
+
+                                cell = QTableWidgetItem(cell_text)
+                                cell.setBackground(QBrush(QColor(c_color)))
+                                cell.setForeground(QBrush(Qt.white))
+                                cell.setTextAlignment(Qt.AlignCenter)
+                                
+                                for i in range(dur):
+                                    if row_s + i < 11: 
+                                        self.sim_cal.setItem(row_s + i, col, QTableWidgetItem(cell))
+                        except: pass
+
+    def check_full_plan_conflicts(self):
+        if not self.simulated_courses:
+            return QMessageBox.information(self, "Info", "No courses simulated yet.")
+
+        # Combine Actual + All Simulated
+        current_registered = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
+        full_plan = list(current_registered) + list(self.simulated_courses)
+
+        # Run Soft Conflict Check
+        warnings = SimulationLogic.check_soft_conflicts(
+            self.dash.logic_system.courses_data, 
+            full_plan
+        )
+
+        # Also check for HARD conflicts (Time Overlaps) manually here if needed,
+        # but the prompt specifically asked for the Soft Conflict/What-If Bonus logic.
+        
+        msg = f"Analyzing plan with {len(full_plan)} courses (Actual + Simulated)...\n\n"
+        
+        if warnings:
+            msg += "⚠️ Soft Conflicts Found:\n" + "\n".join(warnings)
+            QMessageBox.warning(self, "Plan Analysis", msg)
+        else:
+            msg += "✅ No scheduling conflicts detected in this plan!"
+            QMessageBox.information(self, "Plan Analysis", msg)
+
+    def check_hypothetical_conflict(self):
+        # ... (Same logic as before) ...
+        r = self.table.currentRow()
+        if r < 0: return QMessageBox.warning(self, "Error", "Select a course first.")
+        
+        code = self.table.item(r, 0).text()
+        
+        # Simulate adding this to CURRENT schedule
+        current_registered = self.dash.logic_system.get_student_registered_courses(self.dash.student_obj)
+        simulated_schedule = list(current_registered)
+        simulated_schedule.append(code)
+
+        # Run Soft Conflict Check
+        warnings = SimulationLogic.check_soft_conflicts(
+            self.dash.logic_system.courses_data, 
+            simulated_schedule
+        )
+
+        if warnings:
+            QMessageBox.warning(self, "Simulated Conflict", "Soft Conflict Found:\n" + "\n".join(warnings))
+        else:
+            QMessageBox.information(self, "Result", f"No soft conflicts! {code} fits your schedule.")
+
 
 # =============================================================================
 # TAB 6: SETTINGS (NEW PROFILE MAINTENANCE)
@@ -450,12 +797,15 @@ class StudentDashboard(QMainWindow):
         pl_title = QLabel("Program Plan"); pl_title.setProperty("class", "page-title"); pl.addWidget(pl_title)
         self.tbl_plan = QTableWidget(0,5); self.tbl_plan.setHorizontalHeaderLabels(["Level","Code","Name","Credits","Status"]); self.tbl_plan.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch); pl.addWidget(self.tbl_plan)
 
+        # NEW TAB FOR BONUS #7
+        self.tab_whatif = WhatIfTab(self)
+
         self.tab_settings = SettingsTab(self)
 
-        for t in [self.tab_overview, self.tab_register, self.tab_schedule, self.tab_trans, self.tab_plan, self.tab_settings]:
+        for t in [self.tab_overview, self.tab_register, self.tab_schedule, self.tab_trans, self.tab_plan, self.tab_whatif, self.tab_settings]:
             self.stack.addWidget(t)
 
-        names = ["Overview", "Registration", "Schedule", "Transcript", "My Plan", "Settings"]
+        names = ["Overview", "Registration", "Schedule", "Transcript", "My Plan", "What-If Simulator", "Settings"]
         self.btns = []
         for i, name in enumerate(names):
             b = QPushButton(name)
@@ -524,6 +874,7 @@ class StudentDashboard(QMainWindow):
         self.tab_overview.refresh()
         self.tab_register.refresh()
         self.tab_schedule.refresh()
+        self.tab_whatif.refresh()
         self.tab_settings.refresh()
         
         self.tbl_trans.setRowCount(0)
@@ -556,6 +907,7 @@ class StudentDashboard(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
-    window = StudentDashboard(user_id=2454896)  # Example user ID
+    # Replace with a real user ID from your database for testing
+    window = StudentDashboard(user_id=2454896) 
     window.show()
     sys.exit(app.exec_())
