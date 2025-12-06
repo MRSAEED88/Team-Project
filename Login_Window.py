@@ -1,9 +1,13 @@
 import sys
 import sqlite3
 import bcrypt
+import smtplib  # Required for email
+import random   # Required for generating temp password
+import string   # Required for string characters
+from email.mime.text import MIMEText
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton,
-    QVBoxLayout, QHBoxLayout, QFrame, QMessageBox
+    QVBoxLayout, QHBoxLayout, QFrame, QMessageBox, QInputDialog
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
@@ -20,7 +24,7 @@ class LoginWindow(QWidget):
 
         # Make the window start maximized
         self.resize(950, 600)
-        self.showMaximized()  
+        self.showMaximized()
 
         self.setAttribute(Qt.WA_TranslucentBackground)
 
@@ -120,6 +124,22 @@ class LoginWindow(QWidget):
         self.inp_pass.returnPressed.connect(self.login_user)
         layout.addWidget(self.inp_pass)
 
+        # --- FORGOT PASSWORD BUTTON (NEW) ---
+        self.btn_forgot = QPushButton("Forgot Password?")
+        self.btn_forgot.setCursor(Qt.PointingHandCursor)
+        self.btn_forgot.setStyleSheet("""
+            QPushButton {
+                background: transparent; 
+                color: #3498db; 
+                border: none; 
+                font-size: 13px;
+                text-align: right;
+            }
+            QPushButton:hover { text-decoration: underline; }
+        """)
+        self.btn_forgot.clicked.connect(self.handle_forgot_password)
+        layout.addWidget(self.btn_forgot, alignment=Qt.AlignRight)
+
         # LOGIN BUTTON
         self.btn_login = QPushButton("Sign In")
         self.btn_login.setCursor(Qt.PointingHandCursor)
@@ -142,7 +162,93 @@ class LoginWindow(QWidget):
         self.main_layout.addWidget(self.right_frame)
 
     # -------------------------------------------------------
-    # LOGIN LOGIC
+    # LOGIC: FORGOT PASSWORD
+    # -------------------------------------------------------
+    def handle_forgot_password(self):
+        """
+        1. Ask for email.
+        2. Check if exists.
+        3. Generate temp password.
+        4. Update DB.
+        5. Send Email.
+        """
+        email, ok = QInputDialog.getText(self, "Password Recovery", "Enter your registered email address:")
+        
+        if not ok or not email:
+            return
+
+        email = email.strip()
+
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            
+            # Check if email exists
+            cur.execute("SELECT id, name FROM users WHERE email=?", (email,))
+            user = cur.fetchone()
+            
+            if not user:
+                con.close()
+                QMessageBox.warning(self, "Error", "Email address not found.")
+                return
+
+            user_id, name = user
+            
+            # Generate temporary password (8 chars)
+            temp_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+            
+            # Hash it for the database
+            hashed_pw = bcrypt.hashpw(temp_pass.encode('utf-8'), bcrypt.gensalt())
+            
+            # Update Database
+            cur.execute("UPDATE users SET password=? WHERE email=?", (hashed_pw, email))
+            con.commit()
+            con.close()
+
+            # Send Email
+            if self.send_recovery_email(email, temp_pass):
+                QMessageBox.information(self, "Success", f"A temporary password has been sent to {email}.\nPlease check your inbox (and spam folder).")
+            else:
+                # If email fails, show password on screen (ONLY FOR DEMO PURPOSES)
+                QMessageBox.warning(self, "Email Failed", f"Could not send email.\n\nDEMO MODE - Temporary Password: {temp_pass}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Database Error: {e}")
+
+    def send_recovery_email(self, recipient, temp_pass):
+        """
+        Sends the email using smtplib.
+        NOTE: You must fill in YOUR_EMAIL and YOUR_APP_PASSWORD.
+        """
+        # --- CONFIGURATION (FILL THIS IN) ---
+        SENDER_EMAIL = "recoveryee48@gmail.com"  # <--- REPLACE THIS
+        SENDER_PASSWORD = "ioxf bdgy cwjp kkvr"   # <--- REPLACE THIS (Use App Password, not real password)
+        SMTP_SERVER = "smtp.gmail.com"
+        SMTP_PORT = 587
+        
+        # If the user hasn't configured email, fail gracefully so we can show the popup
+        if "your_project_email" in SENDER_EMAIL:
+            print("Email not configured in Login_Window.py")
+            return False
+
+        msg = MIMEText(f"Hello,\n\nYour password reset request was received.\n\nYour Temporary Password is: {temp_pass}\n\nPlease log in and change your password immediately.\n\nRegards,\nKAU Course Registration System")
+        msg['Subject'] = "Password Recovery - KAU Portal"
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = recipient
+
+        try:
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.sendmail(SENDER_EMAIL, recipient, msg.as_string())
+            server.quit()
+            return True
+        except Exception as e:
+            print(f"SMTP Error: {e}")
+            return False
+
+    # -------------------------------------------------------
+    # LOGIC: LOGIN
     # -------------------------------------------------------
     def login_user(self):
         user_input = self.inp_user.text().strip()
@@ -202,8 +308,6 @@ class LoginWindow(QWidget):
         else:
             self.dashboard = StudentDashboard(user_id)
 
-        # --- THIS IS THE FIX ---
-        # Changed from .show() to .showMaximized()
         self.dashboard.showMaximized() 
         self.close()
 
@@ -218,6 +322,5 @@ if __name__ == "__main__":
     app.setFont(font)
 
     window = LoginWindow()
-    # Ensure the login window itself starts maximized
     window.showMaximized() 
     sys.exit(app.exec_())
