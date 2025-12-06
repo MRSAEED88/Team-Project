@@ -337,7 +337,7 @@ class AdminDashboard(QMainWindow):
         col1.addWidget(self.inp_name)
         col1.addWidget(self.inp_credits)
 
-        # Column 2: Schedule
+        # Column 2: Schedule (Hours + Minutes)
         col2 = QVBoxLayout()
         col2.addWidget(QLabel("Schedule (Select Days)"))
         days_layout = QHBoxLayout()
@@ -349,18 +349,27 @@ class AdminDashboard(QMainWindow):
             days_layout.addWidget(cb)
         col2.addLayout(days_layout)
 
-        self.inp_start = QSpinBox()
-        self.inp_start.setRange(8, 20)
-        self.inp_start.setPrefix("Start: ")
-        self.inp_start.setSuffix(":00")
+        # ساعت البداية
+        time_row_start = QHBoxLayout()
+        self.inp_start_hour = QSpinBox()
+        self.inp_start_hour.setRange(8, 20)
+        self.inp_start_hour.setPrefix("Start H: ")
+        self.inp_start_min = QComboBox()
+        self.inp_start_min.addItems(["00", "15", "30", "45"])
+        time_row_start.addWidget(self.inp_start_hour)
+        time_row_start.addWidget(self.inp_start_min)
+        col2.addLayout(time_row_start)
 
-        self.inp_end = QSpinBox()
-        self.inp_end.setRange(9, 21)
-        self.inp_end.setPrefix("End: ")
-        self.inp_end.setSuffix(":00")
-
-        col2.addWidget(self.inp_start)
-        col2.addWidget(self.inp_end)
+        # ساعة النهاية
+        time_row_end = QHBoxLayout()
+        self.inp_end_hour = QSpinBox()
+        self.inp_end_hour.setRange(9, 21)
+        self.inp_end_hour.setPrefix("End H: ")
+        self.inp_end_min = QComboBox()
+        self.inp_end_min.addItems(["00", "15", "30", "45"])
+        time_row_end.addWidget(self.inp_end_hour)
+        time_row_end.addWidget(self.inp_end_min)
+        col2.addLayout(time_row_end)
 
         # Column 3: Location + Prereqs + Buttons
         col3 = QVBoxLayout()
@@ -521,7 +530,6 @@ class AdminDashboard(QMainWindow):
             con = sqlite3.connect("User.db")
             cur = con.cursor()
 
-            # نختار الأعمدة المطلوبة فقط عشان الكود يكون أول عمود
             cur.execute("""
                 SELECT course_code, course_name, credits, day, start_time, end_time, room, max_capacity
                 FROM courses
@@ -603,6 +611,24 @@ class AdminDashboard(QMainWindow):
         for i in range(self.prereq_list.count()):
             codes.append(self.prereq_list.item(i).text())
         return codes
+
+    def parse_time_str(self, s):
+        """
+        يحول نص الوقت مثل '08:30' أو '8' إلى (ساعة, دقيقة)
+        لو في مشكلة يرجع (8, 0) افتراضيًا.
+        """
+        try:
+            s = str(s).strip()
+            if ":" in s:
+                parts = s.split(":")
+                hour = int(parts[0])
+                minute = int(parts[1])
+                return hour, minute
+            else:
+                hour = int(s)
+                return hour, 0
+        except Exception:
+            return 8, 0
 
     # =======================================================
     # HANDLERS - STUDENTS
@@ -692,15 +718,22 @@ class AdminDashboard(QMainWindow):
             return
         day_str = ", ".join(days)
 
-        start = self.inp_start.value()
-        end = self.inp_end.value()
+        # نبني الوقت بصيغة HH:MM
+        start_hour = self.inp_start_hour.value()
+        start_min = self.inp_start_min.currentText()
+        end_hour = self.inp_end_hour.value()
+        end_min = self.inp_end_min.currentText()
+
+        start_time = f"{start_hour:02d}:{start_min}"
+        end_time = f"{end_hour:02d}:{end_min}"
+
         room = self.inp_room.text().strip()
         cap = self.inp_cap.value()
 
         prereqs = self.get_current_prereq_codes()
 
         success, msg = self.admin_logic.add_course(
-            code, name, credits, day_str, start, end, room, cap, prereqs
+            code, name, credits, day_str, start_time, end_time, room, cap, prereqs
         )
 
         if success:
@@ -714,8 +747,10 @@ class AdminDashboard(QMainWindow):
             self.inp_name.clear()
             self.inp_room.clear()
             self.inp_credits.setValue(1)
-            self.inp_start.setValue(8)
-            self.inp_end.setValue(9)
+            self.inp_start_hour.setValue(8)
+            self.inp_start_min.setCurrentIndex(0)
+            self.inp_end_hour.setValue(9)
+            self.inp_end_min.setCurrentIndex(0)
             self.inp_cap.setValue(10)
             for cb in self.day_checkboxes:
                 cb.setChecked(False)
@@ -759,21 +794,25 @@ class AdminDashboard(QMainWindow):
         for cb in self.day_checkboxes:
             cb.setChecked(cb.text() in days_list)
 
-        # الأوقات (نحاول نقرأ أول ساعتين من النص)
-        def parse_hour(s):
-            s = str(s)
-            if ":" in s:
-                try:
-                    return int(s.split(":")[0])
-                except:
-                    return 8
-            try:
-                return int(s)
-            except:
-                return 8
+        # الأوقات (نقرأ HH:MM أو قيمة ساعة فقط)
+        start_h, start_m = self.parse_time_str(start_str)
+        end_h, end_m = self.parse_time_str(end_str)
 
-        self.inp_start.setValue(parse_hour(start_str))
-        self.inp_end.setValue(parse_hour(end_str))
+        self.inp_start_hour.setValue(start_h)
+        self.inp_end_hour.setValue(end_h)
+
+        start_m_str = f"{start_m:02d}"
+        end_m_str = f"{end_m:02d}"
+
+        idx_start_min = self.inp_start_min.findText(start_m_str)
+        if idx_start_min == -1:
+            idx_start_min = 0
+        self.inp_start_min.setCurrentIndex(idx_start_min)
+
+        idx_end_min = self.inp_end_min.findText(end_m_str)
+        if idx_end_min == -1:
+            idx_end_min = 0
+        self.inp_end_min.setCurrentIndex(idx_end_min)
 
         self.inp_room.setText(room)
         try:
@@ -811,8 +850,15 @@ class AdminDashboard(QMainWindow):
             return
         day_str = ", ".join(days)
 
-        start = self.inp_start.value()
-        end = self.inp_end.value()
+        # نبني الوقت بصيغة HH:MM من عناصر الواجهة
+        start_hour = self.inp_start_hour.value()
+        start_min = self.inp_start_min.currentText()
+        end_hour = self.inp_end_hour.value()
+        end_min = self.inp_end_min.currentText()
+
+        start_time = f"{start_hour:02d}:{start_min}"
+        end_time = f"{end_hour:02d}:{end_min}"
+
         room = self.inp_room.text().strip()
         cap = self.inp_cap.value()
 
@@ -827,7 +873,7 @@ class AdminDashboard(QMainWindow):
                 UPDATE courses
                 SET course_name=?, credits=?, day=?, start_time=?, end_time=?, room=?, max_capacity=?
                 WHERE course_code=?
-            """, (name, credits, day_str, f"{start}:00", f"{end}:00", room, cap, code))
+            """, (name, credits, day_str, start_time, end_time, room, cap, code))
 
             # حذف المتطلبات القديمة ثم إضافة الجديدة
             cur.execute("DELETE FROM prerequisites WHERE course_code=?", (code,))
@@ -857,8 +903,10 @@ class AdminDashboard(QMainWindow):
             self.inp_name.clear()
             self.inp_room.clear()
             self.inp_credits.setValue(1)
-            self.inp_start.setValue(8)
-            self.inp_end.setValue(9)
+            self.inp_start_hour.setValue(8)
+            self.inp_start_min.setCurrentIndex(0)
+            self.inp_end_hour.setValue(9)
+            self.inp_end_min.setCurrentIndex(0)
             self.inp_cap.setValue(10)
             for cb in self.day_checkboxes:
                 cb.setChecked(False)
