@@ -43,17 +43,19 @@ class AdminDashboard(QMainWindow):
         self.content_area = QStackedWidget()
         self.main_layout.addWidget(self.content_area)
 
-        # 5. Create Pages
-        self.create_dashboard_page()   # Index 0
-        self.create_students_page()    # Index 1
-        self.create_courses_page()     # Index 2
-        self.create_plans_page()       # Index 3
+        # 5. Create Pages (ترتيب الصفحات مهم لأنه يحدد الـ index)
+        self.create_dashboard_page()      # Index 0
+        self.create_students_page()       # Index 1
+        self.create_courses_page()        # Index 2
+        self.create_plans_page()          # Index 3
+        self.create_transcripts_page()    # Index 4 (الترانسكربت)
 
         # 6. Initial Data Load
         self.load_dashboard_stats()
         self.load_students()
         self.load_courses()
         self.load_plans()
+        self.load_transcript_student_list()  # تحميل الطلاب في قائمة الترانسكربت
 
         # Default Page
         self.nav_dashboard.setChecked(True)
@@ -73,18 +75,41 @@ class AdminDashboard(QMainWindow):
                 border-left: 4px solid transparent;
             }
             QPushButton[class="nav-btn"]:hover { background-color: #34495e; color: white; }
-            QPushButton[class="nav-btn"]:checked { background-color: #34495e; color: white; border-left: 4px solid #3498db; }
-            QLabel[class="page-title"] { font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
-            QLabel[class="section-title"] { font-size: 16px; font-weight: bold; color: #27ae60; margin-top: 10px; }
+            QPushButton[class="nav-btn"]:checked {
+                background-color: #34495e; color: white; border-left: 4px solid #3498db;
+            }
+            QLabel[class="page-title"] {
+                font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;
+            }
+            QLabel[class="section-title"] {
+                font-size: 16px; font-weight: bold; color: #27ae60; margin-top: 10px;
+            }
             QFrame[class="card"] { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; }
-            QTableWidget { background-color: white; border: 1px solid #dcdcdc; gridline-color: #ecf0f1; font-size: 13px; }
-            QHeaderView::section { background-color: #ecf0f1; padding: 8px; border: none; font-weight: bold; color: #2c3e50; }
-            QLineEdit, QComboBox, QSpinBox { padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; background: white; }
-            QPushButton[class="action-btn"] { background-color: #2980b9; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }
+            QTableWidget {
+                background-color: white; border: 1px solid #dcdcdc;
+                gridline-color: #ecf0f1; font-size: 13px;
+            }
+            QHeaderView::section {
+                background-color: #ecf0f1; padding: 8px; border: none;
+                font-weight: bold; color: #2c3e50;
+            }
+            QLineEdit, QComboBox, QSpinBox {
+                padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; background: white;
+            }
+            QPushButton[class="action-btn"] {
+                background-color: #2980b9; color: white; border-radius: 4px;
+                padding: 8px 15px; font-weight: bold;
+            }
             QPushButton[class="action-btn"]:hover { background-color: #3498db; }
-            QPushButton[class="success-btn"] { background-color: #27ae60; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }
+            QPushButton[class="success-btn"] {
+                background-color: #27ae60; color: white; border-radius: 4px;
+                padding: 8px 15px; font-weight: bold;
+            }
             QPushButton[class="success-btn"]:hover { background-color: #2ecc71; }
-            QPushButton[class="danger-btn"] { background-color: #c0392b; color: white; border-radius: 4px; padding: 8px 15px; font-weight: bold; }
+            QPushButton[class="danger-btn"] {
+                background-color: #c0392b; color: white; border-radius: 4px;
+                padding: 8px 15px; font-weight: bold;
+            }
             QPushButton[class="danger-btn"]:hover { background-color: #e74c3c; }
         """)
 
@@ -109,11 +134,13 @@ class AdminDashboard(QMainWindow):
         self.nav_students = self.create_nav_button("Manage Students")
         self.nav_courses = self.create_nav_button("Manage Courses")
         self.nav_plans = self.create_nav_button("Manage Plans")
+        self.nav_transcripts = self.create_nav_button("Student Transcripts")  # زر جديد للترانسكربت
 
         layout.addWidget(self.nav_dashboard)
         layout.addWidget(self.nav_students)
         layout.addWidget(self.nav_courses)
         layout.addWidget(self.nav_plans)
+        layout.addWidget(self.nav_transcripts)
 
         layout.addStretch()
 
@@ -128,6 +155,7 @@ class AdminDashboard(QMainWindow):
         self.nav_students.clicked.connect(lambda: self.switch_page(1, self.nav_students))
         self.nav_courses.clicked.connect(lambda: self.switch_page(2, self.nav_courses))
         self.nav_plans.clicked.connect(lambda: self.switch_page(3, self.nav_plans))
+        self.nav_transcripts.clicked.connect(lambda: self.switch_page(4, self.nav_transcripts))
 
     def create_nav_button(self, text):
         btn = QPushButton(text)
@@ -137,6 +165,7 @@ class AdminDashboard(QMainWindow):
         return btn
 
     def switch_page(self, index, btn_sender):
+        """تغيير الصفحة المعروضة في الـ QStackedWidget"""
         self.content_area.setCurrentIndex(index)
         btn_sender.setChecked(True)
 
@@ -169,7 +198,9 @@ class AdminDashboard(QMainWindow):
     def create_info_card(self, title, value, color):
         card = QFrame()
         card.setProperty("class", "card")
-        card.setStyleSheet(f"border-top: 4px solid {color}; background: white; border-radius: 8px;")
+        card.setStyleSheet(
+            f"border-top: 4px solid {color}; background: white; border-radius: 8px;"
+        )
         l = QVBoxLayout(card)
         l.setContentsMargins(20, 20, 20, 20)
 
@@ -204,12 +235,19 @@ class AdminDashboard(QMainWindow):
 
         self.student_table = QTableWidget()
         self.student_table.setColumnCount(5)
-        self.student_table.setHorizontalHeaderLabels(["ID", "Name", "Email", "Program", "Level"])
+        self.student_table.setHorizontalHeaderLabels(
+            ["ID", "Name", "Email", "Program", "Level"]
+        )
         self.student_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.student_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.student_table.setAlternatingRowColors(True)
         self.student_table.verticalHeader().setVisible(False)
         layout.addWidget(self.student_table)
+
+        # دبل كلك على الطالب يفتح صفحة الترانسكربت مباشرة لهذا الطالب
+        self.student_table.itemDoubleClicked.connect(
+            self.open_transcript_from_students_page
+        )
 
         # Action Bar (Show Password)
         action_layout = QHBoxLayout()
@@ -485,6 +523,75 @@ class AdminDashboard(QMainWindow):
         self.content_area.addWidget(page)
 
     # =======================================================
+    # PAGE 5: STUDENT TRANSCRIPTS (جديدة)
+    # =======================================================
+    def create_transcripts_page(self):
+        """
+        صفحة الترانسكربت:
+        - اختيار طالب
+        - عرض المواد والدرجات من جدول transcripts + المواد المسجّلة من registration
+        - تعديل الدرجات مباشرة من الجدول
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(30, 30, 30, 30)
+
+        title = QLabel("Student Transcripts")
+        title.setProperty("class", "page-title")
+        layout.addWidget(title)
+
+        # شريط علوي لاختيار الطالب
+        top_frame = QFrame()
+        top_frame.setProperty("class", "card")
+        top_layout = QHBoxLayout(top_frame)
+
+        lbl_select = QLabel("Select Student:")
+        self.transcript_student_combo = QComboBox()
+
+        btn_refresh_students = QPushButton("Refresh")
+        btn_refresh_students.setProperty("class", "action-btn")
+        btn_refresh_students.clicked.connect(self.load_transcript_student_list)
+
+        btn_load_transcript = QPushButton("Load Transcript")
+        btn_load_transcript.setProperty("class", "success-btn")
+        btn_load_transcript.clicked.connect(self.handle_load_transcript_clicked)
+
+        top_layout.addWidget(lbl_select)
+        top_layout.addWidget(self.transcript_student_combo)
+        top_layout.addWidget(btn_refresh_students)
+        top_layout.addStretch()
+        top_layout.addWidget(btn_load_transcript)
+
+        layout.addWidget(top_frame)
+
+        # جدول الترانسكربت
+        self.transcript_table = QTableWidget()
+        self.transcript_table.setColumnCount(4)
+        self.transcript_table.setHorizontalHeaderLabels(
+            ["Course Code", "Course Name", "Credits", "Grade"]
+        )
+        self.transcript_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.transcript_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.transcript_table.setAlternatingRowColors(True)
+        self.transcript_table.verticalHeader().setVisible(False)
+        layout.addWidget(self.transcript_table)
+
+        # ملخص + زر حفظ الدرجات
+        summary_layout = QHBoxLayout()
+        self.lbl_transcript_summary = QLabel("No student selected.")
+        summary_layout.addWidget(self.lbl_transcript_summary)
+        summary_layout.addStretch()
+
+        self.btn_save_grades = QPushButton("Save Grades")
+        self.btn_save_grades.setProperty("class", "success-btn")
+        self.btn_save_grades.clicked.connect(self.handle_save_grades)
+        summary_layout.addWidget(self.btn_save_grades)
+
+        layout.addLayout(summary_layout)
+
+        self.content_area.addWidget(page)
+
+    # =======================================================
     # DATA LOADING
     # =======================================================
     def load_dashboard_stats(self):
@@ -531,7 +638,8 @@ class AdminDashboard(QMainWindow):
             cur = con.cursor()
 
             cur.execute("""
-                SELECT course_code, course_name, credits, day, start_time, end_time, room, max_capacity
+                SELECT course_code, course_name, credits, day,
+                       start_time, end_time, room, max_capacity
                 FROM courses
                 ORDER BY course_code
             """)
@@ -589,7 +697,8 @@ class AdminDashboard(QMainWindow):
             cur = con.cursor()
 
             cur.execute(
-                "SELECT program, level, course_code FROM program_plans WHERE program=? ORDER BY level ASC, course_code",
+                "SELECT program, level, course_code FROM program_plans "
+                "WHERE program=? ORDER BY level ASC, course_code",
                 (prog,)
             )
             rows = cur.fetchall()
@@ -603,8 +712,30 @@ class AdminDashboard(QMainWindow):
         except Exception as e:
             print("Plan Load Error:", e)
 
+    # ---------- Transcript: تحميل الطلاب في الكومبوبوكس ----------
+    def load_transcript_student_list(self):
+        """
+        تعبئة ComboBox في صفحة الترانسكربت بقائمة الطلاب:
+        الشكل في الواجهة: "2241234 - Ahmed Ali"
+        الـ data: رقم الطالب (id) فقط.
+        """
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+            cur.execute("SELECT id, name FROM students ORDER BY id")
+            rows = cur.fetchall()
+            con.close()
+
+            self.transcript_student_combo.clear()
+            for sid, sname in rows:
+                display = f"{sid} - {sname}"
+                self.transcript_student_combo.addItem(display, str(sid))
+
+        except Exception as e:
+            print("Transcript Student List Error:", e)
+
     # =======================================================
-    # HELPERS (PREREQS)
+    # HELPERS (PREREQS + TIME)
     # =======================================================
     def get_current_prereq_codes(self):
         codes = []
@@ -645,7 +776,7 @@ class AdminDashboard(QMainWindow):
             QMessageBox.warning(self, "Error", "Please fill ALL fields including password.")
             return
 
-        # --- UPDATED: Use Admin Logic Class (Enforces Encryption) ---
+        # --- Use Admin Logic Class ---
         success, msg = self.admin_logic.add_student(
             student_id, name, email, program, level, password
         )
@@ -654,6 +785,7 @@ class AdminDashboard(QMainWindow):
             QMessageBox.information(self, "Success", msg)
             self.load_students()
             self.load_dashboard_stats()
+            self.load_transcript_student_list()  # تحديث قائمة الطلاب في الترانسكربت
 
             # Clear inputs
             self.inp_s_id.clear()
@@ -682,10 +814,37 @@ class AdminDashboard(QMainWindow):
                 QMessageBox.information(self, "Password", "No user record found in users table.")
             else:
                 pwd = res[0]
-                QMessageBox.information(self, "Password", f"Password for ID {student_id}:\n{pwd}")
+                QMessageBox.information(
+                    self, "Password",
+                    f"Password for ID {student_id}:\n{pwd}"
+                )
 
         except Exception as e:
             QMessageBox.warning(self, "Error", str(e))
+
+    # -------- دبل كلك على الطالب → فتح صفحة الترانسكربت له ----------
+    def open_transcript_from_students_page(self, item):
+        """
+        عند الضغط دبل كلك على أي خلية في صف الطالب:
+        - نجيب ID الطالب
+        - نحول مباشرة لصفحة الترانسكربت
+        - نحمّل سجله الأكاديمي
+        """
+        row = item.row()
+        sid_item = self.student_table.item(row, 0)
+        if not sid_item:
+            return
+
+        student_id = sid_item.text().strip()
+
+        # نحدد الطالب في الكومبو بوكس إن وُجد
+        idx = self.transcript_student_combo.findData(student_id)
+        if idx != -1:
+            self.transcript_student_combo.setCurrentIndex(idx)
+
+        # نفتح صفحة الترانسكربت ونحمّلها
+        self.switch_page(4, self.nav_transcripts)
+        self.load_transcript_for_student(student_id)
 
     # =======================================================
     # HANDLERS - COURSES
@@ -966,7 +1125,8 @@ class AdminDashboard(QMainWindow):
                 QMessageBox.critical(
                     self,
                     "Error",
-                    "Your Admin.py file is missing the 'import_courses_from_csv' method.\nPlease update Admin.py first."
+                    "Your Admin.py file is missing the 'import_courses_from_csv' method.\n"
+                    "Please update Admin.py first."
                 )
 
     # =======================================================
@@ -1029,6 +1189,174 @@ class AdminDashboard(QMainWindow):
 
         except Exception as e:
             QMessageBox.warning(self, "Error", str(e))
+
+    # =======================================================
+    # HANDLERS - TRANSCRIPTS
+    # =======================================================
+    def handle_load_transcript_clicked(self):
+        """
+        يستدعي عند الضغط على زر "Load Transcript"
+        يأخذ الـ student_id من الكومبو بوكس ويحمّل الترانسكربت
+        """
+        idx = self.transcript_student_combo.currentIndex()
+        if idx < 0:
+            QMessageBox.warning(self, "Error", "No student selected.")
+            return
+
+        student_id = self.transcript_student_combo.currentData()
+        if not student_id:
+            QMessageBox.warning(self, "Error", "Invalid student selection.")
+            return
+
+        self.load_transcript_for_student(student_id)
+
+    def load_transcript_for_student(self, student_id):
+        """
+        تحميل الترانسكربت:
+        - يعرض كل المواد المسجّلة من registration
+        - لو فيه Grade في transcripts لنفس المادة تنعرض
+        - يدعم مواد لها Grade فقط بدون تسجيل (مثلاً مواد قديمة)
+        """
+        self.transcript_table.setRowCount(0)
+
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+
+            # اسم الطالب للعرض
+            cur.execute("SELECT name FROM students WHERE id=?", (student_id,))
+            row_name = cur.fetchone()
+            student_name = row_name[0] if row_name else "Unknown"
+
+            # نستخدم UNION بين:
+            # 1) المواد المسجلة في registration (مع join على transcripts)
+            # 2) المواد اللي لها transcripts فقط (غير موجودة في registration)
+            cur.execute("""
+                SELECT course_code, course_name, credits, grade FROM (
+                    SELECT r.course_code AS course_code,
+                           COALESCE(c.course_name, '') AS course_name,
+                           COALESCE(c.credits, 0) AS credits,
+                           t.grade AS grade
+                    FROM registration r
+                    LEFT JOIN courses c ON r.course_code = c.course_code
+                    LEFT JOIN transcripts t
+                           ON t.student_id = r.student_id AND t.course_code = r.course_code
+                    WHERE r.student_id = ?
+
+                    UNION
+
+                    SELECT t.course_code AS course_code,
+                           COALESCE(c.course_name, '') AS course_name,
+                           COALESCE(c.credits, 0) AS credits,
+                           t.grade AS grade
+                    FROM transcripts t
+                    LEFT JOIN courses c ON t.course_code = c.course_code
+                    WHERE t.student_id = ?
+                      AND t.course_code NOT IN (
+                          SELECT course_code FROM registration WHERE student_id = ?
+                      )
+                )
+                ORDER BY course_code
+            """, (student_id, student_id, student_id))
+            rows = cur.fetchall()
+            con.close()
+
+            for row_idx, row_data in enumerate(rows):
+                self.transcript_table.insertRow(row_idx)
+                for col_idx, data in enumerate(row_data):
+                    if data is None:
+                        data = ""
+                    item = QTableWidgetItem(str(data))
+
+                    # أول ثلاث أعمدة Read-Only (كود، اسم، ساعات)
+                    if col_idx in (0, 1, 2):
+                        item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                    else:
+                        # عمود Grade قابل للتعديل
+                        item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
+
+                    self.transcript_table.setItem(row_idx, col_idx, item)
+
+            count_courses = len(rows)
+            self.lbl_transcript_summary.setText(
+                f"Transcript for Student ID {student_id} - {student_name} | "
+                f"Total Courses: {count_courses}"
+            )
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to load transcript: {e}")
+
+    def handle_save_grades(self):
+        """
+        يمر على جدول الترانسكربت ويحدّث جدول transcripts:
+        - لو grade فاضي → يحذف السطر من transcripts (لو موجود)
+        - لو grade موجود → INSERT أو UPDATE
+        يقبل أرقام أو حروف (TEXT في الداتا بيس).
+        """
+        idx = self.transcript_student_combo.currentIndex()
+        if idx < 0:
+            QMessageBox.warning(self, "Error", "No student selected.")
+            return
+
+        student_id = self.transcript_student_combo.currentData()
+        if not student_id:
+            QMessageBox.warning(self, "Error", "Invalid student selection.")
+            return
+
+        row_count = self.transcript_table.rowCount()
+        try:
+            con = sqlite3.connect("User.db")
+            cur = con.cursor()
+
+            for row in range(row_count):
+                code_item = self.transcript_table.item(row, 0)
+                grade_item = self.transcript_table.item(row, 3)
+
+                if not code_item:
+                    continue
+
+                course_code = code_item.text().strip()
+                if not course_code:
+                    continue
+
+                grade = grade_item.text().strip() if grade_item else ""
+
+                if grade == "":
+                    # لو الدرجـة فاضية نحذف أي سجل سابق
+                    cur.execute(
+                        "DELETE FROM transcripts WHERE student_id=? AND course_code=?",
+                        (student_id, course_code)
+                    )
+                else:
+                    # نشوف هل فيه سجل سابق ولا لا
+                    cur.execute(
+                        "SELECT 1 FROM transcripts WHERE student_id=? AND course_code=?",
+                        (student_id, course_code)
+                    )
+                    exists = cur.fetchone()
+
+                    if exists:
+                        cur.execute(
+                            "UPDATE transcripts SET grade=? "
+                            "WHERE student_id=? AND course_code=?",
+                            (grade, student_id, course_code)
+                        )
+                    else:
+                        cur.execute(
+                            "INSERT INTO transcripts (student_id, course_code, grade) "
+                            "VALUES (?, ?, ?)",
+                            (student_id, course_code, grade)
+                        )
+
+            con.commit()
+            con.close()
+
+            QMessageBox.information(self, "Success", "Grades saved successfully.")
+            # نعيد تحميل الترانسكربت بعد الحفظ
+            self.load_transcript_for_student(student_id)
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to save grades: {e}")
 
 
 if __name__ == "__main__":
