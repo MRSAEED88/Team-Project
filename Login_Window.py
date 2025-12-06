@@ -1,6 +1,5 @@
 import sys
 import sqlite3
-import bcrypt
 import smtplib
 import random
 import string
@@ -10,7 +9,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QFrame, QMessageBox, QInputDialog
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QPixmap  # Added QPixmap
+from PyQt5.QtGui import QFont, QPixmap
 
 # --- IMPORT DASHBOARDS ---
 from student_dashboard import StudentDashboard
@@ -50,7 +49,7 @@ class LoginWindow(QWidget):
 
         layout.addStretch()
 
-        # --- UPDATED LOGO SECTION ---
+        # --- LOGO SECTION ---
         img_label = QLabel()
         img_label.setAlignment(Qt.AlignCenter)
         pixmap = QPixmap("kau_logo.png")
@@ -169,7 +168,7 @@ class LoginWindow(QWidget):
         self.main_layout.addWidget(self.right_frame)
 
     # -------------------------------------------------------
-    # LOGIC: FORGOT PASSWORD
+    # LOGIC: FORGOT PASSWORD (PLAIN TEXT UPDATE)
     # -------------------------------------------------------
     def handle_forgot_password(self):
         email, ok = QInputDialog.getText(self, "Password Recovery", "Enter your registered email address:")
@@ -183,6 +182,7 @@ class LoginWindow(QWidget):
             con = sqlite3.connect("User.db")
             cur = con.cursor()
             
+            # Check if email exists
             cur.execute("SELECT id, name FROM users WHERE email=?", (email,))
             user = cur.fetchone()
             
@@ -193,12 +193,13 @@ class LoginWindow(QWidget):
 
             # Generate temporary password (8 chars)
             temp_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-            hashed_pw = bcrypt.hashpw(temp_pass.encode('utf-8'), bcrypt.gensalt())
             
-            cur.execute("UPDATE users SET password=? WHERE email=?", (hashed_pw, email))
+            # STORE AS PLAIN TEXT (No Hash)
+            cur.execute("UPDATE users SET password=? WHERE email=?", (temp_pass, email))
             con.commit()
             con.close()
 
+            # Send Email
             if self.send_recovery_email(email, temp_pass):
                 QMessageBox.information(self, "Success", f"A temporary password has been sent to {email}.")
             else:
@@ -233,7 +234,7 @@ class LoginWindow(QWidget):
             return False
 
     # -------------------------------------------------------
-    # LOGIC: LOGIN
+    # LOGIC: LOGIN (PLAIN TEXT CHECK)
     # -------------------------------------------------------
     def login_user(self):
         user_input = self.inp_user.text().strip()
@@ -256,20 +257,10 @@ class LoginWindow(QWidget):
             user = cur.fetchone()
 
             if user:
-                user_id, name, db_email, pw_hash, membership = user
+                user_id, name, db_email, db_password, membership = user
 
-                if isinstance(pw_hash, str):
-                    pw_bytes = pw_hash.encode()
-                else:
-                    pw_bytes = pw_hash
-
-                valid = False
-                try:
-                    valid = bcrypt.checkpw(password.encode(), pw_bytes)
-                except:
-                    valid = (password == pw_hash or password == pw_bytes.decode())
-
-                if valid:
+                # PLAIN TEXT COMPARISON
+                if password == db_password:
                     self.open_dashboard(user_id, name, db_email, membership)
                 else:
                     QMessageBox.warning(self, "Access Denied", "Incorrect password.")
@@ -289,6 +280,7 @@ class LoginWindow(QWidget):
 
         self.dashboard.showMaximized() 
         self.close()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
