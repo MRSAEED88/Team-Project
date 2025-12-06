@@ -18,9 +18,9 @@ class LoginWindow(QWidget):
         super().__init__()
         self.setWindowTitle("KAU Portal | Secure Login")
 
-        # اجعل الواجهة قابلة للتكبير تلقائيًا
+        # Make the window start maximized
         self.resize(950, 600)
-        self.showMaximized()   # ← أهم سطر
+        self.showMaximized()  
 
         self.setAttribute(Qt.WA_TranslucentBackground)
 
@@ -202,7 +202,9 @@ class LoginWindow(QWidget):
         else:
             self.dashboard = StudentDashboard(user_id)
 
-        self.dashboard.show()
+        # --- THIS IS THE FIX ---
+        # Changed from .show() to .showMaximized()
+        self.dashboard.showMaximized() 
         self.close()
 
 
@@ -216,5 +218,6 @@ if __name__ == "__main__":
     app.setFont(font)
 
     window = LoginWindow()
-    window.show()
+    # Ensure the login window itself starts maximized
+    window.showMaximized() 
     sys.exit(app.exec_())
