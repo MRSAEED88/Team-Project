@@ -1,3 +1,4 @@
+import csv
 from User import User
 import users_db
 
@@ -35,6 +36,71 @@ class Admin(User):
             return True, f"Course '{code}' added successfully."
         except Exception as e:
             return False, f"Database Error: {e}"
+        
+
+
+
+
+    def import_courses_from_csv(self, file_path):
+        """
+        Reads a CSV file and adds courses in bulk.
+        Expected CSV Format: Code, Name, Credits, Day, Start, End, Room, Capacity
+        """
+        success_count = 0
+        errors = []
+
+        try:
+            with open(file_path, newline='', encoding='utf-8') as csvfile:
+                reader = csv.reader(csvfile)
+                # Skip header if it exists (optional check)
+                header = next(reader, None)
+                
+                # Check if the header looks like a header (simple heuristic)
+                if header and "Code" not in header[0] and "code" not in header[0]:
+                    # If first row isn't a header, reset pointer
+                    csvfile.seek(0)
+                
+                for row_num, row in enumerate(reader, start=1):
+                    # Ensure row has enough columns (at least 8)
+                    if len(row) < 8:
+                        errors.append(f"Row {row_num}: Incomplete data.")
+                        continue
+
+                    # Unpack data
+                    code, name, credits, day, start, end, room, cap = row[0:8]
+                    
+                    try:
+                        # Convert types
+                        credits = int(credits)
+                        cap = int(cap)
+                        
+                        # Reuse existing add_course logic to handle validation/DB insert
+                        success, msg = self.add_course(
+                            code.strip(), 
+                            name.strip(), 
+                            credits, 
+                            day.strip(), 
+                            str(start).strip(), 
+                            str(end).strip(), 
+                            room.strip(), 
+                            cap, 
+                            [] # No prerequisites support in simple CSV import yet
+                        )
+                        
+                        if success:
+                            success_count += 1
+                        else:
+                            errors.append(f"Row {row_num} ({code}): {msg}")
+                            
+                    except ValueError:
+                        errors.append(f"Row {row_num} ({code}): Invalid numeric format for credits or capacity.")
+                    except Exception as e:
+                        errors.append(f"Row {row_num}: Unexpected error {str(e)}")
+
+            return True, f"Imported {success_count} courses successfully.\nErrors: {len(errors)}", errors
+
+        except Exception as e:
+            return False, f"File Error: {str(e)}", []
 
     # ============================================================
     #                       DELETE COURSE
